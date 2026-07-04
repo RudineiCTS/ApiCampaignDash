@@ -9,9 +9,9 @@ namespace ApiCampaignDash.Infrastructure.Data.Configurations
         public void Configure(EntityTypeBuilder<CampaignResume> builder)
         {
             builder.ToTable("tblCampanhaComercial");
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.Id).HasColumnName("IDCampanhaComercial");
-            builder.Property(x => x.Nome).HasColumnName("NomeCampanha").HasMaxLength(100);
+            builder.HasKey(x => x.IdCampaign);
+            builder.Property(x => x.IdCampaign).HasColumnName("IDCampanhaComercial");
+            builder.Property(x => x.TitleCampaign).HasColumnName("NomeCampanha").HasMaxLength(100);
         }
     }
 }
