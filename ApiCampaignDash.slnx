@@ -2,6 +2,7 @@
   <Project Path="ApiCampaignDash.Application/ApiCampaignDash.Application.csproj" />
   <Project Path="ApiCampaignDash.Domain/ApiCampaignDash.Domain.csproj" />
   <Project Path="ApiCampaignDash.Infrastructure/ApiCampaignDash.Infrastructure.csproj" />
+  <Project Path="ApiCampaignDash.Tests/ApiCampaignDash.Tests.csproj" />
   <Project Path="ApiCampaignDash.UI/ApiCampaignDash.UI.csproj" />
   <Project Path="ApiCampaignDash/ApiCampaignDash.csproj" />
 </Solution>
