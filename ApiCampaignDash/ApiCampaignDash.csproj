@@ -16,10 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\ApiCampaignDash.Application\ApiCampaignDash.Application.csproj" />
     <ProjectReference Include="..\ApiCampaignDash.Infrastructure\ApiCampaignDash.Infrastructure.csproj" />
   </ItemGroup>
 

@@ -1,3 +1,6 @@
+using ApiCampaignDash.Application.Interfaces;
+using ApiCampaignDash.Application.Mappings;
+using ApiCampaignDash.Application.Services;
 using ApiCampaignDash.Domain.Interfaces;
 using ApiCampaignDash.Infrastructure.Data;
 using ApiCampaignDash.Infrastructure.Data.Repositories;
@@ -11,9 +14,10 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddAutoMapper(cfg => { }, typeof(CampaignProfile));
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
-
+builder.Services.AddScoped<ICampaignService, CampaignService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

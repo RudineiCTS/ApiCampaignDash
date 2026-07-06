@@ -16,14 +16,16 @@ namespace ApiCampaignDash.Infrastructure.Data.Configurations
             builder.Property(x => x.StartDate).HasColumnName("DataInicioApuracao");
             builder.Property(x => x.EndDate).HasColumnName("DataFimApuracao");
             builder.Property(x => x.TotalRanking).HasColumnName("TotalRanking");
-            builder.Property(x => x.Description).HasColumnName("DescricaoCampanha").HasMaxLength(200);
+            builder.Property(x => x.Description).HasColumnName("DescricaoCampanha").HasMaxLength(150);
             builder.Property(x => x.IdAssessmentType).HasColumnName("IDCampanhaTelevendasTipoApuracao");
             builder.Property(x => x.IdCalculationMethod).HasColumnName("IDCampanhaTelevendasTipoCalculo");
             builder.Property(x => x.ValidationRule).HasColumnName("RegraValidacao");
-            builder.Property(x => x.ValueType).HasColumnName("TipoValor").HasMaxLength(50);
+            builder.Property(x => x.ValueType).HasColumnName("TipoValor");
             builder.Property(x => x.EarlyEndDate).HasColumnName("DataFimAntecipada");
-            builder.Property(x => x.Notes).HasColumnName("Observacao");
-            builder.Property(x => x.ConsidersExclusives).HasColumnName("ConsideraExclusivas");
+            builder.Property(x => x.Notes).HasColumnName("Observacao").HasMaxLength(150);
+            // ConsideraExclusivas e TipoCampanhaTelevendas sao armazenadas como int/bit no banco;
+            // convertidas para bool? no dominio por representarem flags.
+            builder.Property(x => x.ConsidersExclusives).HasColumnName("ConsideraExclusivas").HasConversion<int?>();
             builder.Property(x => x.CampaignType).HasColumnName("TipoCampanhaTelevendas");
         }
     }

@@ -1,29 +1,20 @@
 ﻿using ApiCampaignDash.Domain.Entities;
 using ApiCampaignDash.Domain.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace ApiCampaignDash.Infrastructure.Data.Repositories
 {
-    public class CampaignRepository : ICampaignRepository
+    public class CampaignRepository : BaseRepository<Campaign>, ICampaignRepository
     {
-        private readonly AppDbContext _context;
-
-        public CampaignRepository(AppDbContext context)
+        public CampaignRepository(AppDbContext context) : base(context)
         {
-            _context = context;
         }
-        public Task<IEnumerable<Campaign>> GetAllAsync()
+        public async Task<IEnumerable<Campaign>> GetByPeriodCampaignAsync(DateTime datetime)
         {
-            throw new NotImplementedException();
-        }
-
-        public Task<Campaign?> GetByIdAsync(int id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IEnumerable<Campaign>> GetByPeriodCampaignAsync(DateTime datetime)
-        {
-            throw new NotImplementedException();
+            return await _context.Campaigns
+                .AsNoTracking()
+                .Where(c => c.CompetenceDate == datetime)
+                .ToListAsync();
         }
     }
 }
