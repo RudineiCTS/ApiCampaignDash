@@ -32,6 +32,13 @@ namespace ApiCampaignDash.Application.Services
         public async Task<IEnumerable<CampaignDto>> GetByPeriodCampaignAsync(DateTime datetime)
         {
             var campaigns = await _repository.GetByPeriodCampaignAsync(datetime);
+            //return campaigns.Select(c => new CampaignDto
+            //{
+            //    IdCampaign = c.IdCampaign,
+            //    Description = c.Description,
+            //    StartDate = c.StartDate,
+            //    EndDate = c.EndDate
+            //});
             return _mapper.Map<IEnumerable<CampaignDto>>(campaigns);
         }
     }

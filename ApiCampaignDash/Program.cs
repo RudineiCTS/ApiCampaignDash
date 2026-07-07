@@ -5,6 +5,7 @@ using ApiCampaignDash.Domain.Interfaces;
 using ApiCampaignDash.Infrastructure.Data;
 using ApiCampaignDash.Infrastructure.Data.Repositories;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddAutoMapper(cfg => { }, typeof(CampaignProfile));
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
