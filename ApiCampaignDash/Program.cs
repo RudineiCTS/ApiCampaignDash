@@ -19,13 +19,26 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddAutoMapper(cfg => { }, typeof(CampaignProfile));
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<ICampaignResultReportRepository, CampaignResultReportRepository>();
+builder.Services.AddScoped<ICampaignResultReportService, CampaignResultReportService>();
+builder.Services.AddScoped<ICampaignSummaryRepository, CampaignSummaryRepository>();
+builder.Services.AddScoped<ICampaignSummaryService, CampaignSummaryService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowElectronApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") // origem do seu Electron/Vite
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 var app = builder.Build();
-
+app.UseCors("AllowElectronApp");
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
