@@ -23,6 +23,14 @@ builder.Services.AddScoped<ICampaignResultReportRepository, CampaignResultReport
 builder.Services.AddScoped<ICampaignResultReportService, CampaignResultReportService>();
 builder.Services.AddScoped<ICampaignSummaryRepository, CampaignSummaryRepository>();
 builder.Services.AddScoped<ICampaignSummaryService, CampaignSummaryService>();
+builder.Services.AddScoped<IManufacturerRepository, ManufacturerRepository>();
+builder.Services.AddScoped<IManufacturerService, ManufacturerService>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IProductLineRepository, ProductLineRepository>();
+builder.Services.AddScoped<IProductLineService, ProductLineService>();
+builder.Services.AddScoped<IClientsRepository, ClientsRepository>();
+builder.Services.AddScoped<IClientsService, ClientsService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -32,7 +40,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowElectronApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // origem do seu Electron/Vite
+        policy.WithOrigins("http://localhost:5173", "http://192.168.3.208:5173") // origem do seu Electron/Vite
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -46,7 +54,7 @@ if (app.Environment.IsDevelopment())
 }
 // ─── DbContext ───────────────────────────────────────────
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseAuthorization();
 

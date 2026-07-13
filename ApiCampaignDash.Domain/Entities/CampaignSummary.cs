@@ -39,5 +39,9 @@ namespace ApiCampaignDash.Domain.Entities
         [StringLength(150)]
         [Display(Name = "Observação")]
         public string? Notes { get; set; }
+
+        [StringLength(50)]
+        [Display(Name = "Tipo de Campanha")]
+        public string? TypeCampaign { get; set; }
     }
 }
