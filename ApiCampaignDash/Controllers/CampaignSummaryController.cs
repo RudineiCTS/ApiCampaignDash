@@ -22,5 +22,13 @@ namespace ApiCampaignDash.Controllers
             var summary = await _service.GetSummaryAsync(competenceDateFrom);
             return Ok(summary);
         }
+
+        // GET: api/campaign-summary/details/5
+        [HttpGet("details/{id:int}")]
+        public async Task<ActionResult<IEnumerable<CampaignResultReportDto>>> GetDetails(int id)
+        {
+            var details = await _service.GetDetailsAsync(id);
+            return Ok(details);
+        }
     }
 }

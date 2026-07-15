@@ -21,5 +21,11 @@ namespace ApiCampaignDash.Application.Services
             var summaries = await _repository.GetSummaryAsync(competenceDateFrom);
             return _mapper.Map<IEnumerable<CampaignSummaryDto>>(summaries);
         }
+
+        public async Task<IEnumerable<CampaignResultReportDto>> GetDetailsAsync(int idCampaign)
+        {
+            var details = await _repository.GetDetailsAsync(idCampaign);
+            return _mapper.Map<IEnumerable<CampaignResultReportDto>>(details);
+        }
     }
 }
