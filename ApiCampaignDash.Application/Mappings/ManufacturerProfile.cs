@@ -8,7 +8,7 @@ namespace ApiCampaignDash.Application.Mappings
     {
         public ManufacturerProfile()
         {
-            CreateMap<Manufacturer, ManufacturerDto>();
+            CreateMap<Manufacturer, ManufacturerDto>().ReverseMap();
         }
     }
 }

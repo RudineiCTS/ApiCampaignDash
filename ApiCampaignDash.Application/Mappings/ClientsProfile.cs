@@ -8,7 +8,7 @@ namespace ApiCampaignDash.Application.Mappings
     {
         public ClientsProfile()
         {
-            CreateMap<Clients, ClientsDto>();
+            CreateMap<Clients, ClientsDto>().ReverseMap();
         }
     }
 }

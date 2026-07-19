@@ -6,8 +6,7 @@ namespace ApiCampaignDash.Infrastructure.Data
     public class AppDbContext:DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-        public DbSet<CampaignResume> Campanhas { get; set; }
-
+        public DbSet<CampaignResume> Campanhas { get; set; }        
         public DbSet<Campaign> Campaigns { get; set; }
         public DbSet<PersonType> PersonTypes { get; set; }
         public DbSet<CompetencePeriodStatus> CompetencePeriodStatuses { get; set; }

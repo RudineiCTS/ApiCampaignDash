@@ -8,7 +8,7 @@ namespace ApiCampaignDash.Application.Mappings
     {
         public ProductLineProfile()
         {
-            CreateMap<ProductLine, ProductLineDto>();
+            CreateMap<ProductLine, ProductLineDto>().ReverseMap();
         }
     }
 }
