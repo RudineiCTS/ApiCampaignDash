@@ -19,12 +19,13 @@ namespace ApiCampaignDash.Controllers
 
         [HttpGet("campaign-resume-sellout/{id:int}")]
         public async Task<ActionResult<IEnumerable<CampaignResumeSellOutDto>>> GetCampaignResumeSellOuts(
-               [FromRoute] int id,
-               [FromQuery] DateTime startDate,
-               [FromQuery] DateTime endDate
+               [FromRoute] int id
             )
         {
-            var Campaignparams = await _campaignResumeSellOutService.GetCampaignParams(id, startDate, endDate);
+            var Campaignparams = await _campaignResumeSellOutService.GetCampaignParams(id);
+            if (Campaignparams == null)
+                return NotFound();
+
             var campaignResumeSellOutsList = await _campaignResumeSellOutService.GetCampaignResumeSellOutsAsync(Campaignparams);
             return Ok(campaignResumeSellOutsList);
         }

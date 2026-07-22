@@ -3,8 +3,7 @@
 namespace ApiCampaignDash.Application.DTOs
 {
     public class CampaignResumeSellOutDto
-    {
-        public int IdCampaign { get; set; }        
+    {           
         public string CPFCNPJ { get; set; } = string.Empty;        
         public string LegalName { get; set; } = string.Empty;        
         public string ProductCode { get; set; } = string.Empty;        

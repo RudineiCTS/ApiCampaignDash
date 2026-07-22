@@ -9,6 +9,7 @@ namespace ApiCampaignDash.Application.Services
     public class CampaignResumeSellOutService : ICampaignResumeSellOutService
     {
         private readonly ICampaignResumeSellOutRepository _campaignResumeSellOutRepository;
+        private readonly ICampaignRepository _campaignRepository;
         private readonly IClientsRepository _clientsRepository;
         private readonly IManufacturerRepository _manufacturerRepository;
         private readonly IProductLineRepository _productLineRepository;
@@ -17,6 +18,7 @@ namespace ApiCampaignDash.Application.Services
 
         public CampaignResumeSellOutService(
             ICampaignResumeSellOutRepository campaignResumeSellOutRepository,
+            ICampaignRepository campaignRepository,
             IClientsRepository clientsRepository,
             IManufacturerRepository manufacturerRepository,
             IProductLineRepository productLineRepository,
@@ -24,6 +26,7 @@ namespace ApiCampaignDash.Application.Services
             IMapper mapper)
         {
             _campaignResumeSellOutRepository = campaignResumeSellOutRepository;
+            _campaignRepository = campaignRepository;
             _clientsRepository = clientsRepository;
             _manufacturerRepository = manufacturerRepository;
             _productLineRepository = productLineRepository;
@@ -47,11 +50,15 @@ namespace ApiCampaignDash.Application.Services
 
             };
             var campaignResumeSellOuts = await _campaignResumeSellOutRepository.GetCampaignResumeSellOutsAsync(campaignParam);
-            return (IEnumerable<CampaignResumeSellOutDto>)campaignResumeSellOuts;
+            return _mapper.Map<IEnumerable<CampaignResumeSellOutDto>>(campaignResumeSellOuts);
         }
 
-        public async Task<CampaignParamsDto> GetCampaignParams(int idCampaign, DateTime StartDate, DateTime EndDate)
+        public async Task<CampaignParamsDto?> GetCampaignParams(int idCampaign)
         {
+            var campaign = await _campaignRepository.GetByIdAsync(idCampaign);
+            if (campaign == null)
+                return null;
+
             var manufacturers = await _manufacturerRepository.GetByCampaignIdAsync(idCampaign);
             var manufacturerDtos = _mapper.Map<IEnumerable<ManufacturerDto>>(manufacturers);
 
@@ -72,8 +79,8 @@ namespace ApiCampaignDash.Application.Services
                 Products = (List<ProductDto>)productDtos,
                 Clients = (List<ClientsDto>)clientDtos,
                 IdCampaign = idCampaign,
-                StartDate = StartDate,
-                EndDate = EndDate,
+                StartDate = campaign.StartDate,
+                EndDate = campaign.EndDate,
                 /*fixos*/
                 idOrigim=1,
                 IsValidSellOutGC = true

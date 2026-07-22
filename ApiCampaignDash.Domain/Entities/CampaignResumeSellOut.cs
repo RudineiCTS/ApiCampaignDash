@@ -4,8 +4,6 @@ namespace ApiCampaignDash.Domain.Entities
 {
     public class CampaignResumeSellOut
     {
-        [Display(Name = "Identificador da Campanha")]
-        public int IdCampaign { get; set; }
 
         [Display(Name ="Cliente")]
         public string CPFCNPJ { get; set; } = string.Empty;
