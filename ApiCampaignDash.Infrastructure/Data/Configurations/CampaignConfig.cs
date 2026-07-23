@@ -27,6 +27,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Configurations
             // convertidas para bool? no dominio por representarem flags.
             builder.Property(x => x.ConsidersExclusives).HasColumnName("ConsideraExclusivas").HasConversion<int?>();
             builder.Property(x => x.CampaignType).HasColumnName("TipoCampanhaTelevendas");
+            builder.Property(x => x.IsDynamic).HasColumnName("Dinamica");
         }
     }
 }

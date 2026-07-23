@@ -14,5 +14,6 @@ namespace ApiCampaignDash.Application.DTOs
         public decimal? PercentageAchieved { get; set; }
         public string? Notes { get; set; }
         public string? TypeCampaign { get; set; }
+        public bool? IsDynamic { get; set; }
     }
 }

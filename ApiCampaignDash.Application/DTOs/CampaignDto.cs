@@ -19,5 +19,6 @@ namespace ApiCampaignDash.Application.DTOs
         public string? Notes { get; set; }
         public bool? ConsidersExclusives { get; set; }
         public bool? CampaignType { get; set; }
+        public bool? IsDynamic { get; set; }
     }
 }

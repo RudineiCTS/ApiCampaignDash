@@ -23,6 +23,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                 SUM(tblCamTelFaiPre.PremioValor) AS TotalPot,
                 CASE WHEN tblCamTelMet.MetaValor = 0 THEN 0 ELSE CAST((tblCamTelRes.ValorApurado / tblCamTelMet.MetaValor) * 100 AS DECIMAL(18,2)) END AS PercentageAchieved,
                 tblCamTel.Observacao AS Notes,
+                tblCamTel.Dinamica AS IsDynamic,
                 'valor' TypeCampaign
             FROM
                 GS300GP.dbo.tblCampanhaTelevendas tblCamTel (NOLOCK)
@@ -68,7 +69,8 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                 tblCamTelRes.ValorApurado,
                 tblPre.PremiacaoTotal,
                 tblCamTel.Observacao,
-                tblCamTelRes.ValorApuradoBees
+                tblCamTelRes.ValorApuradoBees,
+                tblCamTel.Dinamica
             """;
 
         private readonly AppDbContext _context;

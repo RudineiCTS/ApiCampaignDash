@@ -56,5 +56,8 @@ namespace ApiCampaignDash.Domain.Entities
 
         [Display(Name = "Tipo de Campanha")]
         public bool? CampaignType { get; set; }
+
+        [Display(Name = "Dinâmica")]
+        public bool? IsDynamic { get; set; }
     }
 }
