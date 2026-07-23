@@ -26,6 +26,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
 
             parameters.Add(new SqlParameter("@StartDate", campaign.StartDate ?? (object)DBNull.Value));
             parameters.Add(new SqlParameter("@EndDate", campaign.EndDate ?? (object)DBNull.Value));
+            
             parameters.Add(new SqlParameter("@IDOrigem", campaign.idOrigim));
 
             var sql = $@"
@@ -40,20 +41,24 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                     uvwPesVen.Nome                          AS SellerName
                 FROM 
                     GS300BI.dbo.tblConsolidacaoVendas AS tblConVen WITH (NOLOCK)
-                LEFT JOIN GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPes WITH (NOLOCK)
-                    ON uvwPes.IDPessoa = tblConVen.IDPessoaCliente
-                LEFT JOIN GS300ERP.dbo.vwProduto AS vwPro WITH (NOLOCK)
-                    ON vwPro.IDProduto = tblConVen.IDProduto
-                LEFT JOIN GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPesVen WITH (NOLOCK)
-                    ON uvwPesVen.IDPessoa = tblConVen.IDPessoaVendedor
+                LEFT JOIN 
+                    tblComissaoVendasClienteVendedor AS tblComVenCliVen WITH (NOLOCK) ON tblComVenCliVen.IDCliente = tblConVen.IDPessoaCliente
+                LEFT JOIN 
+                    GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPes WITH (NOLOCK) ON uvwPes.IDPessoa = tblConVen.IDPessoaCliente
+                LEFT JOIN 
+                    GS300ERP.dbo.vwProduto AS vwPro WITH (NOLOCK) ON vwPro.IDProduto = tblConVen.IDProduto
+                LEFT JOIN 
+                    GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPesVen WITH (NOLOCK) ON uvwPesVen.IDPessoa = tblConVen.IDPessoaVendedor
                 WHERE 
-                    tblConVen.DataFaturamento BETWEEN @StartDate AND @EndDate
+                  tblConVen.DataFaturamento BETWEEN @StartDate AND @EndDate
                   AND tblConVen.IDDigitador IN (SELECT UsuarioDigitador FROM tblCampanhaTelevendasBaseDigitadoras WITH (NOLOCK))
                   AND tblConVen.IDOrigem = @IDOrigem
                   {(manufacturerClause.HasItems ? $"AND tblConVen.IDPessoaFabricante IN ({manufacturerClause.Sql})" : "")}
                   {(productLineClause.HasItems ? $"AND tblConVen.IDProdutoLinha IN ({productLineClause.Sql})" : "")}
                   {(productClause.HasItems ? $"AND tblConVen.IDProduto IN ({productClause.Sql})" : "")}
                   {(clientClause.HasItems ? $"AND tblConVen.IDPessoaCliente IN ({clientClause.Sql})" : "")}
+                  AND tblComVenCliVen.IDGerente <> 159452 /* DANIEL CAMPOS PRESTE */
+                  AND tblComVenCliVen.IDComissaoVendasCenario  IN (SELECT GS300GP.dbo.fnObterIDComissaoVendasCenario(@EndDate))
                 GROUP BY
                     uvwPes.CpfCnpj, uvwPes.RazaoSocial, tblConVen.IDProduto,
                     vwPro.CodBarras, uvwPesVen.Nome, vwPro.DescProduto
@@ -69,18 +74,20 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                     SUM(tblConVen.Quantidade)               AS QuantitySold,
                     SUM(tblConVen.Total)                    AS ValueSold,
                     tblSegUsu.NomeUsuario                   AS SellerName
-                FROM GS300BI.dbo.tblConsolidacaoVendas AS tblConVen WITH (NOLOCK)
-                JOIN tblVendasBees AS tblVenBees WITH (NOLOCK)
-                    ON tblVenBees.IDPedido = tblConVen.IDPedido AND tblVenBees.IDOperacao = tblConVen.IDOperacao
-                LEFT JOIN tblComissaoVendasClienteVendedor AS tblComVenCliVen WITH (NOLOCK)
-                    ON tblComVenCliVen.IDCliente = tblConVen.IDPessoaCliente
-                LEFT JOIN GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPes WITH (NOLOCK)
-                    ON uvwPes.IDPessoa = tblConVen.IDPessoaCliente
-                LEFT JOIN GS300ERP.dbo.vwProduto AS vwPro WITH (NOLOCK)
-                    ON vwPro.IDProduto = tblConVen.IDProduto
-                LEFT JOIN GS300ERP.dbo.tblSegUsuario AS tblSegUsu WITH (NOLOCK)
-                    ON tblVenBees.IDDigitador = tblSegUsu.IDUsuario
-                WHERE tblConVen.DataFaturamento >= @StartDate
+                FROM 
+                    GS300BI.dbo.tblConsolidacaoVendas AS tblConVen WITH (NOLOCK)
+                JOIN
+                    tblVendasBees AS tblVenBees WITH (NOLOCK) ON tblVenBees.IDPedido = tblConVen.IDPedido AND tblVenBees.IDOperacao = tblConVen.IDOperacao
+                LEFT JOIN 
+                    tblComissaoVendasClienteVendedor AS tblComVenCliVen WITH (NOLOCK) ON tblComVenCliVen.IDCliente = tblConVen.IDPessoaCliente
+                LEFT JOIN 
+                    GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPes WITH (NOLOCK) ON uvwPes.IDPessoa = tblConVen.IDPessoaCliente
+                LEFT JOIN 
+                    GS300ERP.dbo.vwProduto AS vwPro WITH (NOLOCK) ON vwPro.IDProduto = tblConVen.IDProduto
+                LEFT JOIN 
+                    GS300ERP.dbo.tblSegUsuario AS tblSegUsu WITH (NOLOCK) ON tblVenBees.IDDigitador = tblSegUsu.IDUsuario
+                WHERE 
+                  tblConVen.DataFaturamento >= @StartDate
                   AND tblConVen.DataFaturamento < DATEADD(DAY, 1, @EndDate)
                   {(manufacturerClause.HasItems ? $"AND tblConVen.IDPessoaFabricante IN ({manufacturerClause.Sql})" : "")}
                   {(productLineClause.HasItems ? $"AND tblConVen.IDProdutoLinha IN ({productLineClause.Sql})" : "")}
@@ -88,7 +95,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                   {(clientClause.HasItems ? $"AND tblConVen.IDPessoaCliente IN ({clientClause.Sql})" : "")}
                   AND tblVenBees.IDDigitador <> 'ce782385-bece-485b-9e33-05ec60591610' /* BRENDA EXCLUSIVA GRANDES CONTAS */
                   AND tblComVenCliVen.IDGerente <> 159452 /* DANIEL CAMPOS PRESTE */
-                  AND tblComVenCliVen.IDComissaoVendasCenario = 100
+                  AND tblComVenCliVen.IDComissaoVendasCenario  IN (SELECT GS300GP.dbo.fnObterIDComissaoVendasCenario(@EndDate))
                 GROUP BY
                     uvwPes.CpfCnpj, uvwPes.RazaoSocial, tblConVen.IDProduto,
                     vwPro.DescProduto, vwPro.CodBarras, tblSegUsu.NomeUsuario";

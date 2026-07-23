@@ -23,6 +23,8 @@ builder.Services.AddScoped<ICampaignResultReportRepository, CampaignResultReport
 builder.Services.AddScoped<ICampaignResultReportService, CampaignResultReportService>();
 builder.Services.AddScoped<ICampaignSummaryRepository, CampaignSummaryRepository>();
 builder.Services.AddScoped<ICampaignSummaryService, CampaignSummaryService>();
+builder.Services.AddScoped<ICampaignSummaryByDescriptionRepository, CampaignSummaryByDescriptionRepository>();
+builder.Services.AddScoped<ICampaignSummaryByDescriptionService, CampaignSummaryByDescriptionService>();
 builder.Services.AddScoped<IManufacturerRepository, ManufacturerRepository>();
 builder.Services.AddScoped<IManufacturerService, ManufacturerService>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();

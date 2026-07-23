@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ApiCampaignDash.Infrastructure.Data.Repositories
 {
-    public class CampaignSummaryRepository : ICampaignSummaryRepository
+    public class CampaignSummaryByDescriptionRepository : ICampaignSummaryByDescriptionRepository
     {
         private const string Sql = """
             SELECT
@@ -48,7 +48,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                 LEFT JOIN
                     GS300GP.dbo.tblCampanhaTelevendasMeta tblCamTelMet (NOLOCK) ON tblCamTelMet.IDCampanhaTelevendas = tblCamTel.IDCampanhaTelevendas
                 WHERE
-                    CAST(tblCamTel.DataCompetencia AS DATE) = @dataMinima
+                    CAST(tblCamTel.DataCompetencia AS DATE) >= @dataMinima
                 GROUP BY
                     tblCamTelRes.IDCampanhaTelevendas,
                     tblCamTelRes.DescricaoCampanha,
@@ -57,9 +57,10 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
             LEFT JOIN
                 GS300GP.dbo.tblCampanhaTelevendasFaixaPremiacao tblCamTelFaiPre (NOLOCK) ON tblCamTelFaiPre.IDCampanhaTelevendas = tblCamTel.IDCampanhaTelevendas
             WHERE
-                CAST(tblCamTel.DataCompetencia AS DATE) = @dataMinima AND
+                CAST(tblCamTel.DataCompetencia AS DATE) >= @dataMinima AND
                 tblCamTelRes.TipoPessoa = 1 AND /* SUPERVISOR */
                 tblCamTel.IDCampanhaTelevendasPeriodoCompetenciaSituacao <> 4 /* CANCELADO */
+                AND tblCamTelRes.DescricaoCampanha LIKE @descricao
             GROUP BY
                 tblCamTel.IDCampanhaTelevendas,
                 tblCamTelRes.DescricaoCampanha,
@@ -75,54 +76,22 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
 
         private readonly AppDbContext _context;
 
-        public CampaignSummaryRepository(AppDbContext context)
+        public CampaignSummaryByDescriptionRepository(AppDbContext context)
         {
             _context = context;
         }
 
-        public async Task<IEnumerable<CampaignSummary>> GetSummaryAsync(DateTime competenceDateFrom)
+        public async Task<IEnumerable<CampaignSummary>> GetSummaryByDescriptionAsync(DateTime competenceDateFrom, string description)
         {
             var parameters = new object[]
             {
-                new SqlParameter("@dataMinima", competenceDateFrom.Date)
+                new SqlParameter("@dataMinima", competenceDateFrom.Date),
+                new SqlParameter("@descricao", $"{description}%")
             };
 
             return await _context.Database
                 .SqlQueryRaw<CampaignSummary>(Sql, parameters)
                 .ToListAsync();
-        }
-
-        public async Task<IEnumerable<CampaignResultReport>> GetDetailsAsync(int idCampaign)
-        {
-            return await _context.Database.SqlQuery<CampaignResultReport>($"""
-                SELECT
-                    tblCamTelRes.IDCampanhaTelevendas AS IdCampaign,
-                    tblCamTelRes.DescricaoCampanha AS CampaignDescription,
-                    tblCamTelRes.DataCompetencia AS CompetenceDate,
-                    CASE WHEN tblCamTel.IDCampanhaTelevendasTipoApuracao = 1 THEN 'POSITIVAÇÃO'
-                        WHEN tblCamTel.IDCampanhaTelevendasTipoApuracao = 2 THEN 'VENDAS'
-                        WHEN tblCamTel.IDCampanhaTelevendasTipoApuracao = 3 THEN 'QUANTIDADE VENDIDA'
-                        WHEN tblCamTel.IDCampanhaTelevendasTipoApuracao = 6 THEN 'POSITIVAÇÃO ESPECÍFICA' END AS CampaignTypeDescription,
-                    tblCamTelRes.IDSupervisor AS IdSupervisor,
-                    tblCamTelRes.NomeSupervisor AS SupervisorName,
-                    tblCamTelRes.IDPessoaTelevendas AS IdPersonSales,
-                    tblCamTelRes.NomeDigitador AS OperatorName,
-                    tblCamTelRes.ObjetivoIndividual AS IndividualTarget,
-                    tblCamTelRes.ValorApurado AS AssessedValue,
-                    tblCamTelRes.PercentualRealizadoIndividual AS PercentageAchieved,
-                    tblCamTelRes.Ranking AS Ranking,
-                    tblCamTelRes.Premiacao AS Award,
-                    tblCamTelRes.LogCalculo AS CalculationLog,
-                    tblCamTelRes.DataCalculo AS CalculationDate
-                FROM
-                    GS300GP.dbo.tblCampanhaTelevendas tblCamTel (NOLOCK)
-                LEFT JOIN
-                    GS300GP.dbo.tblCampanhaTelevendasResultado tblCamTelRes (NOLOCK)
-                        ON tblCamTelRes.IDCampanhaTelevendas = tblCamTel.IDCampanhaTelevendas
-                        AND tblCamTelRes.DataCompetencia = tblCamTel.DataCompetencia
-                WHERE
-                    tblCamTelRes.IDCampanhaTelevendas = {idCampaign}
-                """).ToListAsync();
         }
     }
 }
