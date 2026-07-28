@@ -15,5 +15,15 @@ namespace ApiCampaignDash.Application.DTOs
         public string? Notes { get; set; }
         public string? TypeCampaign { get; set; }
         public bool? IsDynamic { get; set; }
+        public int IdCompetencePeriodStatus { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public int? TotalRanking { get; set; }
+        public int IdAssessmentType { get; set; }
+        public int IdCalculationMethod { get; set; }
+        public int? ValidationRule { get; set; }
+        public int ValueType { get; set; }
+        public DateTime? EarlyEndDate { get; set; }
+        public bool? ConsidersExclusives { get; set; }
     }
 }

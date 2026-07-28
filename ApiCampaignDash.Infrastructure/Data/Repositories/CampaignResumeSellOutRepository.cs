@@ -38,7 +38,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                     vwPro.CodBarras                         AS ProductEan,
                     SUM(tblConVen.Quantidade)               AS QuantitySold,
                     SUM(tblConVen.Total)                    AS ValueSold,
-                    uvwPesVen.Nome                          AS SellerName
+                    uvwPesVen.NomeUsuario                          AS SellerName
                 FROM 
                     GS300BI.dbo.tblConsolidacaoVendas AS tblConVen WITH (NOLOCK)
                 LEFT JOIN 
@@ -48,7 +48,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                 LEFT JOIN 
                     GS300ERP.dbo.vwProduto AS vwPro WITH (NOLOCK) ON vwPro.IDProduto = tblConVen.IDProduto
                 LEFT JOIN 
-                    GS300ERP.dbo.uvwPessoaFisicaJuridica AS uvwPesVen WITH (NOLOCK) ON uvwPesVen.IDPessoa = tblConVen.IDPessoaVendedor
+                    GS300ERP.dbo.tblSegUsuario AS uvwPesVen WITH (NOLOCK) ON uvwPesVen.IDUsuario = tblConVen.IDDigitador
                 WHERE 
                   tblConVen.DataFaturamento BETWEEN @StartDate AND @EndDate
                   AND tblConVen.IDDigitador IN (SELECT UsuarioDigitador FROM tblCampanhaTelevendasBaseDigitadoras WITH (NOLOCK))
@@ -61,7 +61,7 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                   AND tblComVenCliVen.IDComissaoVendasCenario  IN (SELECT GS300GP.dbo.fnObterIDComissaoVendasCenario(@EndDate))
                 GROUP BY
                     uvwPes.CpfCnpj, uvwPes.RazaoSocial, tblConVen.IDProduto,
-                    vwPro.CodBarras, uvwPesVen.Nome, vwPro.DescProduto
+                    vwPro.CodBarras, uvwPesVen.NomeUsuario, vwPro.DescProduto
 
                 UNION
 

@@ -15,6 +15,15 @@ namespace ApiCampaignDash.Domain.Entities
         [Display(Name = "Nome do Cliente")]
         public string ? ClientName { get; set; } = string.Empty;
 
+        [Display(Name = "CPF/CNPJ")]
+        public string ? CpfCnpj { get; set; }
+
+        [Display(Name = "Cidade")]
+        public string ? City { get; set; }
+
+        [Display(Name = "UF")]
+        public string ? State { get; set; }
+
         [Display(Name = "Contém")]
         public string ? IsValid { get; set; } = string.Empty;
     }

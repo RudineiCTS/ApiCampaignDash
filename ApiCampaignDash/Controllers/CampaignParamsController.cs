@@ -49,11 +49,19 @@ namespace ApiCampaignDash.Controllers
             return Ok(result);
         }
 
-        // GET: Campaign/Params/Detail/cliente/5
+        // GET: Campaign/Params/Detail/cliente/5?idCliente=123&pageNumber=1&pageSize=50
         [HttpGet("cliente/{idCampaign:int}")]
-        public async Task<ActionResult<IEnumerable<ClientsDto>>> GetClients(int idCampaign)
+        public async Task<ActionResult<PagedResultDto<ClientsDto>>> GetClients(
+            int idCampaign,
+            [FromQuery] int? idCliente,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 50)
         {
-            var result = await _clientsService.GetByCampaignIdAsync(idCampaign);
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 50;
+            if (pageSize > 200) pageSize = 200;
+
+            var result = await _clientsService.GetByCampaignIdPagedAsync(idCampaign, idCliente, pageNumber, pageSize);
             return Ok(result);
         }
     }

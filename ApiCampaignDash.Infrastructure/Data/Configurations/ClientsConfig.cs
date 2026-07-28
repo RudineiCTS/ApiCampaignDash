@@ -13,8 +13,11 @@ namespace ApiCampaignDash.Infrastructure.Data.Configurations
             builder.Property(x => x.IdCampaign).HasColumnName("IDCampanhaTelevendas");
             builder.Property(x => x.IdClients).HasColumnName("IDCliente");
             builder.Property(x => x.IsValid).HasColumnName("Contem");
-            // ClientName vem de join com a tabela mestre de clientes, nao existe na tabela de campanha
+            // ClientName, CpfCnpj, City e State vem de join com a tabela mestre de clientes, nao existem na tabela de campanha
             builder.Ignore(x => x.ClientName);
+            builder.Ignore(x => x.CpfCnpj);
+            builder.Ignore(x => x.City);
+            builder.Ignore(x => x.State);
         }
     }
 }

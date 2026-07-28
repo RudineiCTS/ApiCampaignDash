@@ -24,7 +24,17 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                 CASE WHEN tblCamTelMet.MetaValor = 0 THEN 0 ELSE CAST((tblCamTelRes.ValorApurado / tblCamTelMet.MetaValor) * 100 AS DECIMAL(18,2)) END AS PercentageAchieved,
                 tblCamTel.Observacao AS Notes,
                 tblCamTel.Dinamica AS IsDynamic,
-                'valor' TypeCampaign
+                'valor' TypeCampaign,
+                tblCamTel.IDCampanhaTelevendasPeriodoCompetenciaSituacao AS IdCompetencePeriodStatus,
+                tblCamTel.DataInicioApuracao AS StartDate,
+                tblCamTel.DataFimApuracao AS EndDate,
+                tblCamTel.TotalRanking AS TotalRanking,
+                tblCamTel.IDCampanhaTelevendasTipoApuracao AS IdAssessmentType,
+                tblCamTel.IDCampanhaTelevendasTipoCalculo AS IdCalculationMethod,
+                tblCamTel.RegraValidacao AS ValidationRule,
+                tblCamTel.TipoValor AS ValueType,
+                tblCamTel.DataFimAntecipada AS EarlyEndDate,
+                CAST(tblCamTel.ConsideraExclusivas AS BIT) AS ConsidersExclusives
             FROM
                 GS300GP.dbo.tblCampanhaTelevendas tblCamTel (NOLOCK)
             LEFT JOIN
@@ -70,7 +80,16 @@ namespace ApiCampaignDash.Infrastructure.Data.Repositories
                 tblPre.PremiacaoTotal,
                 tblCamTel.Observacao,
                 tblCamTelRes.ValorApuradoBees,
-                tblCamTel.Dinamica
+                tblCamTel.Dinamica,
+                tblCamTel.IDCampanhaTelevendasPeriodoCompetenciaSituacao,
+                tblCamTel.DataInicioApuracao,
+                tblCamTel.DataFimApuracao,
+                tblCamTel.TotalRanking,
+                tblCamTel.IDCampanhaTelevendasTipoCalculo,
+                tblCamTel.RegraValidacao,
+                tblCamTel.TipoValor,
+                tblCamTel.DataFimAntecipada,
+                tblCamTel.ConsideraExclusivas
             """;
 
         private readonly AppDbContext _context;

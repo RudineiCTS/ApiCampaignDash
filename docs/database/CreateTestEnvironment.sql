@@ -1,0 +1,753 @@
+/* =====================================================================
+   ApiCampaignDash - Script de criacao de AMBIENTE DE TESTE completo
+   =====================================================================
+   Cria os 3 bancos usados pela API (GS300GP, GS300ERP, GS300BI), todas as
+   tabelas necessarias (reconstruidas a partir do AppDbContext, das
+   EntityTypeConfiguration e das queries SQL cruas dos repositorios) e
+   popula com dados de exemplo suficientes para exercitar TODAS as rotas
+   da API atualmente implementadas.
+
+   - GS300GP  -> banco principal da aplicacao (Initial Catalog do
+                 appsettings.json). Contem as tabelas tblCampanhaTelevendas*.
+   - GS300ERP -> em producao contem VIEWS (uvwPessoaFisicaJuridica, vwProduto,
+                 tblProduto, tblProdutoLinha, uvwClienteOutrasInformacoes).
+                 Aqui sao recriadas como TABELAS apenas para possibilitar
+                 testes locais.
+   - GS300BI  -> em producao contem a tabela de consolidacao de vendas
+                 (tblConsolidacaoVendas) usada no relatorio de sell-out.
+
+   O script e idempotente: pode ser executado mais de uma vez sem duplicar
+   estrutura nem dados (usa IF OBJECT_ID / IF NOT EXISTS em todo lugar).
+
+   Ajuste o nome do servidor/instancia no seu client SQL antes de rodar.
+   Requer permissao para CREATE DATABASE.
+   ===================================================================== */
+
+SET NOCOUNT ON;
+GO
+
+/* =====================================================================
+   0) CRIACAO DOS BANCOS
+   ===================================================================== */
+
+IF DB_ID('GS300GP') IS NULL CREATE DATABASE GS300GP;
+GO
+IF DB_ID('GS300ERP') IS NULL CREATE DATABASE GS300ERP;
+GO
+IF DB_ID('GS300BI') IS NULL CREATE DATABASE GS300BI;
+GO
+
+
+/* =====================================================================
+   1) GS300GP - TABELAS DO MODULO DE CAMPANHA
+   ===================================================================== */
+
+USE GS300GP;
+GO
+
+/* ---------- Tabelas de dominio / lookup ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasTipoApuracao', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasTipoApuracao
+(
+    IDCampanhaTelevendasTipoApuracao INT NOT NULL PRIMARY KEY,
+    DescricaoTipoApuracao            VARCHAR(200) NOT NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasTipoCalculo', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasTipoCalculo
+(
+    IDCampanhaTelevendasTipoCalculo INT NOT NULL PRIMARY KEY,
+    DescricaoTipoCalculo            VARCHAR(200) NOT NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasPeriodoCompetenciaSituacao', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasPeriodoCompetenciaSituacao
+(
+    IDCampanhaTelevendasPeriodoCompetenciaSituacao INT NOT NULL PRIMARY KEY,
+    DescricaoPeriodoCompetenciaSituacao            VARCHAR(200) NOT NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasTipoPessoa', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasTipoPessoa
+(
+    IDCampanhaTelevendasTipoPessoa INT NOT NULL PRIMARY KEY,
+    Descricao                      VARCHAR(200) NOT NULL
+);
+GO
+
+/* ---------- Tabela principal da campanha ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendas', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendas
+(
+    IDCampanhaTelevendas                            INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    DataCompetencia                                  DATETIME NULL,
+    IDCampanhaTelevendasPeriodoCompetenciaSituacao   INT NOT NULL,
+    DataInicioApuracao                               DATETIME NULL,
+    DataFimApuracao                                  DATETIME NULL,
+    TotalRanking                                     INT NULL,
+    DescricaoCampanha                                VARCHAR(150) NOT NULL,
+    IDCampanhaTelevendasTipoApuracao                 INT NOT NULL,
+    IDCampanhaTelevendasTipoCalculo                  INT NOT NULL,
+    RegraValidacao                                   INT NULL,
+    TipoValor                                        INT NOT NULL,
+    DataFimAntecipada                                DATETIME NULL,
+    Observacao                                       VARCHAR(150) NULL,
+    ConsideraExclusivas                              INT NULL,
+    TipoCampanhaTelevendas                           BIT NULL,
+    Dinamica                                         BIT NULL,
+    CONSTRAINT FK_tblCampanhaTelevendas_TipoApuracao
+        FOREIGN KEY (IDCampanhaTelevendasTipoApuracao) REFERENCES dbo.tblCampanhaTelevendasTipoApuracao (IDCampanhaTelevendasTipoApuracao),
+    CONSTRAINT FK_tblCampanhaTelevendas_TipoCalculo
+        FOREIGN KEY (IDCampanhaTelevendasTipoCalculo) REFERENCES dbo.tblCampanhaTelevendasTipoCalculo (IDCampanhaTelevendasTipoCalculo),
+    CONSTRAINT FK_tblCampanhaTelevendas_PeriodoCompetenciaSituacao
+        FOREIGN KEY (IDCampanhaTelevendasPeriodoCompetenciaSituacao) REFERENCES dbo.tblCampanhaTelevendasPeriodoCompetenciaSituacao (IDCampanhaTelevendasPeriodoCompetenciaSituacao)
+);
+GO
+
+/* ---------- Metas ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasMeta', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasMeta
+(
+    IDCampanhaTelevendas INT NOT NULL PRIMARY KEY,
+    MetaValor            DECIMAL(18,2) NOT NULL,
+    GatilhoPositivacao   DECIMAL(18,2) NOT NULL,
+    GatilhoVenda         DECIMAL(18,2) NOT NULL,
+    CONSTRAINT FK_tblCampanhaTelevendasMeta_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasMetaInd', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasMetaInd
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDPessoa             INT NOT NULL,
+    IDSupervisor         INT NOT NULL,
+    TipoPessoa           INT NOT NULL,
+    MetaValor            DECIMAL(18,2) NOT NULL,
+    Gatilho              DECIMAL(18,2) NOT NULL,
+    IDGerente            INT NOT NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasMetaInd PRIMARY KEY (IDCampanhaTelevendas, IDPessoa),
+    CONSTRAINT FK_tblCampanhaTelevendasMetaInd_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+/* ---------- Faixa de premiacao ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasFaixaPremiacao', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasFaixaPremiacao
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    ValorInicio          DECIMAL(18,2) NOT NULL,
+    ValorFim             DECIMAL(18,2) NOT NULL,
+    RankingInicio        INT NOT NULL,
+    RankingFim           INT NOT NULL,
+    PremioValor          DECIMAL(18,2) NOT NULL,
+    LimitePremio         DECIMAL(18,2) NOT NULL,
+    TipoPessoa           INT NOT NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasFaixaPremiacao PRIMARY KEY (IDCampanhaTelevendas, TipoPessoa, RankingInicio),
+    CONSTRAINT FK_tblCampanhaTelevendasFaixaPremiacao_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+/* ---------- Resultado apurado ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasResultado', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasResultado
+(
+    IDCampanhaTelevendas          INT NOT NULL,
+    DataCompetencia               DATETIME NOT NULL,
+    DescricaoCampanha             VARCHAR(200) NOT NULL,
+    IDPessoaTelevendas            INT NOT NULL,
+    NomeDigitador                 VARCHAR(200) NOT NULL,
+    Ranking                       INT NOT NULL,
+    ValorApurado                  DECIMAL(18,2) NOT NULL,
+    Premiacao                     DECIMAL(18,2) NOT NULL,
+    LogCalculo                    VARCHAR(MAX) NULL,
+    DataCalculo                   DATETIME NOT NULL,
+    TipoPessoa                    INT NOT NULL,
+    IDSupervisor                  INT NOT NULL,
+    NomeSupervisor                VARCHAR(200) NOT NULL,
+    RealizadoTotal                DECIMAL(18,2) NOT NULL,
+    ObjetivoIndividual            DECIMAL(18,2) NOT NULL,
+    PercentualRealizadoIndividual DECIMAL(18,2) NOT NULL,
+    ValorApuradoBees              DECIMAL(18,2) NOT NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasResultado PRIMARY KEY (IDCampanhaTelevendas, IDPessoaTelevendas),
+    CONSTRAINT FK_tblCampanhaTelevendasResultado_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+/* ---------- Combo / Produto / Fabricante / Linha / Cliente / Digitadora (regras da campanha) ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasCombo', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasCombo
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDCombo              INT NOT NULL,
+    Contem               VARCHAR(10) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasCombo PRIMARY KEY (IDCampanhaTelevendas, IDCombo),
+    CONSTRAINT FK_tblCampanhaTelevendasCombo_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasProduto', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasProduto
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDProduto            INT NOT NULL,
+    Contem               VARCHAR(10) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasProduto PRIMARY KEY (IDCampanhaTelevendas, IDProduto),
+    CONSTRAINT FK_tblCampanhaTelevendasProduto_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasFabricante', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasFabricante
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDFabricante         INT NOT NULL,
+    Contem               VARCHAR(10) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasFabricante PRIMARY KEY (IDCampanhaTelevendas, IDFabricante),
+    CONSTRAINT FK_tblCampanhaTelevendasFabricante_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasLinhaProduto', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasLinhaProduto
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDLinhaProduto       INT NOT NULL,
+    Contem               VARCHAR(10) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasLinhaProduto PRIMARY KEY (IDCampanhaTelevendas, IDLinhaProduto),
+    CONSTRAINT FK_tblCampanhaTelevendasLinhaProduto_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasCliente', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasCliente
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDCliente            INT NOT NULL,
+    Contem               VARCHAR(10) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasCliente PRIMARY KEY (IDCampanhaTelevendas, IDCliente),
+    CONSTRAINT FK_tblCampanhaTelevendasCliente_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasDigitadora', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasDigitadora
+(
+    IDCampanhaTelevendas INT NOT NULL,
+    IDPessoaTelevendas   INT NOT NULL,
+    Contem               VARCHAR(10) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasDigitadora PRIMARY KEY (IDCampanhaTelevendas, IDPessoaTelevendas),
+    CONSTRAINT FK_tblCampanhaTelevendasDigitadora_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasRegraValidacao', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasRegraValidacao
+(
+    IDCampanhaTelevendas          INT NOT NULL,
+    IDCampanhaTelevendasValidar   INT NOT NULL,
+    ResultadoValidacao            VARCHAR(50) NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasRegraValidacao PRIMARY KEY (IDCampanhaTelevendas, IDCampanhaTelevendasValidar),
+    CONSTRAINT FK_tblCampanhaTelevendasRegraValidacao_Campanha
+        FOREIGN KEY (IDCampanhaTelevendas) REFERENCES dbo.tblCampanhaTelevendas (IDCampanhaTelevendas)
+);
+GO
+
+/* ---------- Base de digitadoras / supervisores ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasBaseDigitadoras', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasBaseDigitadoras
+(
+    IDSupervisor       INT NOT NULL,
+    NomeSupervisor     VARCHAR(200) NOT NULL,
+    IDPessoaTelevendas INT NOT NULL,
+    NomeDigitador      VARCHAR(200) NOT NULL,
+    UsuarioDigitador   VARCHAR(100) NOT NULL,
+    IDSetor            INT NOT NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasBaseDigitadoras PRIMARY KEY (IDSupervisor, IDPessoaTelevendas)
+);
+GO
+
+/* ---------- Distincao pessoa x fabricante ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaTelevendasDistincaoPessoaFabricante', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaTelevendasDistincaoPessoaFabricante
+(
+    IDFabricante         INT NOT NULL,
+    DescricaoFabricante  VARCHAR(200) NOT NULL,
+    IDPessoa             INT NOT NULL,
+    IDDigitador          INT NOT NULL,
+    CONSTRAINT PK_tblCampanhaTelevendasDistincaoPessoaFabricante PRIMARY KEY (IDFabricante, IDPessoa)
+);
+GO
+
+/* ---------- Campanha comercial (legado, sem controller ativo hoje) ---------- */
+
+IF OBJECT_ID('dbo.tblCampanhaComercial', 'U') IS NULL
+CREATE TABLE dbo.tblCampanhaComercial
+(
+    IDCampanhaComercial INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    NomeCampanha        VARCHAR(100) NOT NULL
+);
+GO
+
+/* ---------- Tabelas de comissao/vendas Bees usadas pelo relatorio de Sell-Out ---------- */
+
+IF OBJECT_ID('dbo.tblVendasBees', 'U') IS NULL
+CREATE TABLE dbo.tblVendasBees
+(
+    IDPedido    INT NULL,
+    IDOperacao  INT NULL,
+    IDDigitador UNIQUEIDENTIFIER NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblComissaoVendasClienteVendedor', 'U') IS NULL
+CREATE TABLE dbo.tblComissaoVendasClienteVendedor
+(
+    IDCliente               INT NULL,
+    IDGerente               INT NULL,
+    IDComissaoVendasCenario INT NULL
+);
+GO
+
+/* Stub da function usada em CampaignResumeSellOutRepository - so para viabilizar teste local */
+IF OBJECT_ID('dbo.fnObterIDComissaoVendasCenario', 'FN') IS NOT NULL
+    DROP FUNCTION dbo.fnObterIDComissaoVendasCenario;
+GO
+CREATE FUNCTION dbo.fnObterIDComissaoVendasCenario (@DataReferencia DATE)
+RETURNS INT
+AS
+BEGIN
+    RETURN 1;
+END
+GO
+
+
+/* =====================================================================
+   2) GS300ERP - TABELAS MESTRE (recriadas como TABELA; em producao sao VIEWS)
+   ===================================================================== */
+
+USE GS300ERP;
+GO
+
+IF OBJECT_ID('dbo.uvwPessoaFisicaJuridica', 'U') IS NULL
+CREATE TABLE dbo.uvwPessoaFisicaJuridica
+(
+    IDPessoa    INT NOT NULL PRIMARY KEY,
+    CpfCnpj     VARCHAR(20) NULL,
+    RazaoSocial VARCHAR(200) NULL,
+    Nome        VARCHAR(200) NULL
+);
+GO
+
+IF OBJECT_ID('dbo.vwProduto', 'U') IS NULL
+CREATE TABLE dbo.vwProduto
+(
+    IDProduto   INT NOT NULL PRIMARY KEY,
+    DescProduto VARCHAR(200) NULL,
+    CodBarras   VARCHAR(20) NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblProduto', 'U') IS NULL
+CREATE TABLE dbo.tblProduto
+(
+    IDProduto   INT NOT NULL PRIMARY KEY,
+    DescProduto VARCHAR(200) NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblProdutoLinha', 'U') IS NULL
+CREATE TABLE dbo.tblProdutoLinha
+(
+    IDProdutoLinha    INT NOT NULL PRIMARY KEY,
+    DescProdutoLinha  VARCHAR(200) NULL
+);
+GO
+
+IF OBJECT_ID('dbo.uvwClienteOutrasInformacoes', 'U') IS NULL
+CREATE TABLE dbo.uvwClienteOutrasInformacoes
+(
+    IDCliente   INT NOT NULL PRIMARY KEY,
+    NomeCliente VARCHAR(200) NULL,
+    CPF_CNPJ    VARCHAR(20) NULL,
+    DescCidade  VARCHAR(100) NULL,
+    UFCidade    VARCHAR(2) NULL
+);
+GO
+
+IF OBJECT_ID('dbo.tblSegUsuario', 'U') IS NULL
+CREATE TABLE dbo.tblSegUsuario
+(
+    IDUsuario   UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    NomeUsuario VARCHAR(200) NULL
+);
+GO
+
+
+/* =====================================================================
+   3) GS300BI - CONSOLIDACAO DE VENDAS (usada no relatorio de Sell-Out)
+   ===================================================================== */
+
+USE GS300BI;
+GO
+
+IF OBJECT_ID('dbo.tblConsolidacaoVendas', 'U') IS NULL
+CREATE TABLE dbo.tblConsolidacaoVendas
+(
+    IDPedido            INT NULL,
+    IDOperacao          INT NULL,
+    IDProduto           INT NULL,
+    IDProdutoLinha      INT NULL,
+    IDPessoaCliente     INT NULL,
+    IDPessoaVendedor    INT NULL,
+    IDPessoaFabricante  INT NULL,
+    IDDigitador         UNIQUEIDENTIFIER NULL,
+    IDOrigem            INT NULL,
+    DataFaturamento     DATETIME NULL,
+    Quantidade          INT NULL,
+    Total               DECIMAL(18,2) NULL
+);
+GO
+
+
+/* =====================================================================
+   4) MASSA DE DADOS DE TESTE
+   =====================================================================
+   IDs usados (para facilitar os testes manuais na API):
+     Fabricante ......... 501
+     Linha de Produto .... 601
+     Produtos ............ 701, 702
+     Clientes ............ 801, 802
+     Supervisor .......... 901
+     Pessoa Televendas ... 1001
+     Campanhas ........... 1 (aberta/positivacao), 2 (fechada/vendas), 3 (cancelada)
+   ===================================================================== */
+
+USE GS300ERP;
+GO
+
+/* ---------- Fabricante / Cliente (pessoa fisica ou juridica) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwPessoaFisicaJuridica WHERE IDPessoa = 501)
+INSERT INTO dbo.uvwPessoaFisicaJuridica (IDPessoa, CpfCnpj, RazaoSocial, Nome) VALUES
+(501, '11222333000144', 'Fabricante Teste LTDA', 'Fabricante Teste LTDA');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwPessoaFisicaJuridica WHERE IDPessoa = 801)
+INSERT INTO dbo.uvwPessoaFisicaJuridica (IDPessoa, CpfCnpj, RazaoSocial, Nome) VALUES
+(801, '11122233344', 'Farmacia Teste Cliente 1 LTDA', 'Farmacia Teste Cliente 1'),
+(802, '55566677788', 'Farmacia Teste Cliente 2 LTDA', 'Farmacia Teste Cliente 2');
+GO
+
+/* ---------- Produto (view legada usada no relatorio de Sell-Out) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.vwProduto WHERE IDProduto = 701)
+INSERT INTO dbo.vwProduto (IDProduto, DescProduto, CodBarras) VALUES
+(701, 'Produto Teste 700ML', '7891234567901'),
+(702, 'Produto Teste Sache 20UN', '7891234567902');
+GO
+
+/* ---------- Produto (tabela mestre usada na rota /Campaign/Params/Detail/produto) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblProduto WHERE IDProduto = 701)
+INSERT INTO dbo.tblProduto (IDProduto, DescProduto) VALUES
+(701, 'Produto Teste 700ML'),
+(702, 'Produto Teste Sache 20UN');
+GO
+
+/* ---------- Linha de Produto (rota /Campaign/Params/Detail/linha) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblProdutoLinha WHERE IDProdutoLinha = 601)
+INSERT INTO dbo.tblProdutoLinha (IDProdutoLinha, DescProdutoLinha) VALUES
+(601, 'Linha Higiene e Beleza');
+GO
+
+/* ---------- Cliente com dados completos (rota /Campaign/Params/Detail/cliente) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwClienteOutrasInformacoes WHERE IDCliente = 801)
+INSERT INTO dbo.uvwClienteOutrasInformacoes (IDCliente, NomeCliente, CPF_CNPJ, DescCidade, UFCidade) VALUES
+(801, 'Farmacia Teste Cliente 1', '11122233344', 'Sao Paulo', 'SP'),
+(802, 'Farmacia Teste Cliente 2', '55566677788', 'Campinas', 'SP');
+GO
+
+/* ---------- Usuarios/vendedores (Sell-Out: nome do vendedor) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblSegUsuario WHERE IDUsuario = 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA')
+INSERT INTO dbo.tblSegUsuario (IDUsuario, NomeUsuario) VALUES
+('AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 'Vendedor Teste Convencional'),
+('BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB', 'Vendedor Teste Bees');
+GO
+
+
+USE GS300GP;
+GO
+
+/* ---------- Lookups ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasTipoApuracao WHERE IDCampanhaTelevendasTipoApuracao = 1)
+INSERT INTO dbo.tblCampanhaTelevendasTipoApuracao (IDCampanhaTelevendasTipoApuracao, DescricaoTipoApuracao) VALUES
+(1, 'POSITIVACAO'),
+(2, 'VENDAS'),
+(3, 'QUANTIDADE VENDIDA'),
+(6, 'POSITIVACAO ESPECIFICA');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasTipoCalculo WHERE IDCampanhaTelevendasTipoCalculo = 1)
+INSERT INTO dbo.tblCampanhaTelevendasTipoCalculo (IDCampanhaTelevendasTipoCalculo, DescricaoTipoCalculo) VALUES
+(1, 'Calculo Padrao'),
+(2, 'Calculo Alternativo');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasPeriodoCompetenciaSituacao WHERE IDCampanhaTelevendasPeriodoCompetenciaSituacao = 1)
+INSERT INTO dbo.tblCampanhaTelevendasPeriodoCompetenciaSituacao (IDCampanhaTelevendasPeriodoCompetenciaSituacao, DescricaoPeriodoCompetenciaSituacao) VALUES
+(1, 'ABERTO'),
+(2, 'FECHADO'),
+(3, 'EM APURACAO'),
+(4, 'CANCELADO');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasTipoPessoa WHERE IDCampanhaTelevendasTipoPessoa = 1)
+INSERT INTO dbo.tblCampanhaTelevendasTipoPessoa (IDCampanhaTelevendasTipoPessoa, Descricao) VALUES
+(1, 'SUPERVISOR'),
+(2, 'DIGITADOR'),
+(3, 'GERENTE');
+GO
+
+/* ---------- Campanhas de teste ----------
+   Campanha 1: aberta, positivacao, periodo = mes atual.
+   Campanha 2: fechada, vendas, periodo = mes anterior.
+   Campanha 3: cancelada (deve ser IGNORADA pelo /campaign-summary e pelo relatorio de resultado). */
+DECLARE @Hoje       DATE = CAST(GETDATE() AS DATE);
+DECLARE @InicioMes  DATE = DATEFROMPARTS(YEAR(@Hoje), MONTH(@Hoje), 1);
+DECLARE @FimMes     DATE = EOMONTH(@Hoje);
+DECLARE @InicioMesAnterior DATE = DATEADD(MONTH, -1, @InicioMes);
+DECLARE @FimMesAnterior    DATE = EOMONTH(@InicioMesAnterior);
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendas WHERE IDCampanhaTelevendas = 1)
+BEGIN
+    SET IDENTITY_INSERT dbo.tblCampanhaTelevendas ON;
+
+    INSERT INTO dbo.tblCampanhaTelevendas
+        (IDCampanhaTelevendas, DataCompetencia, IDCampanhaTelevendasPeriodoCompetenciaSituacao,
+         DataInicioApuracao, DataFimApuracao, TotalRanking, DescricaoCampanha,
+         IDCampanhaTelevendasTipoApuracao, IDCampanhaTelevendasTipoCalculo, RegraValidacao,
+         TipoValor, DataFimAntecipada, Observacao, ConsideraExclusivas, TipoCampanhaTelevendas, Dinamica)
+    VALUES
+        (1, @InicioMes, 1,
+         @InicioMes, @FimMes, 10, 'Campanha Teste Positivacao',
+         1, 1, NULL,
+         1, NULL, 'Campanha de teste - aberta', 0, 0, 0),
+
+        (2, @InicioMesAnterior, 2,
+         @InicioMesAnterior, @FimMesAnterior, 10, 'Campanha Teste Vendas',
+         2, 1, NULL,
+         1, NULL, 'Campanha de teste - fechada', 0, 0, 0),
+
+        (3, @InicioMesAnterior, 4,
+         @InicioMesAnterior, @FimMesAnterior, 10, 'Campanha Teste Cancelada',
+         1, 1, NULL,
+         1, NULL, 'Campanha de teste - cancelada (deve ser ignorada no resumo)', 0, 0, 0);
+
+    SET IDENTITY_INSERT dbo.tblCampanhaTelevendas OFF;
+END
+GO
+
+/* ---------- Meta ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasMeta WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasMeta (IDCampanhaTelevendas, MetaValor, GatilhoPositivacao, GatilhoVenda) VALUES
+(1, 10000.00, 5000.00, 5000.00),
+(2, 20000.00, 8000.00, 8000.00);
+GO
+
+/* ---------- Faixa de premiacao (TipoPessoa: 1 = Supervisor) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasFaixaPremiacao WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasFaixaPremiacao
+    (IDCampanhaTelevendas, ValorInicio, ValorFim, RankingInicio, RankingFim, PremioValor, LimitePremio, TipoPessoa) VALUES
+(1, 0.00, 5000.00,  1, 3,  300.00, 1000.00, 1),
+(1, 5000.01, 999999.00, 4, 10, 500.00, 1500.00, 1),
+(2, 0.00, 999999.00, 1, 10, 400.00, 1200.00, 1);
+GO
+
+/* ---------- Resultado apurado (supervisor + operador) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasResultado WHERE IDCampanhaTelevendas = 1 AND IDPessoaTelevendas = 901)
+INSERT INTO dbo.tblCampanhaTelevendasResultado
+    (IDCampanhaTelevendas, DataCompetencia, DescricaoCampanha, IDPessoaTelevendas, NomeDigitador, Ranking,
+     ValorApurado, Premiacao, LogCalculo, DataCalculo, TipoPessoa, IDSupervisor, NomeSupervisor,
+     RealizadoTotal, ObjetivoIndividual, PercentualRealizadoIndividual, ValorApuradoBees)
+SELECT
+    1, DataCompetencia, 'Campanha Teste Positivacao', 901, 'Supervisor Teste', 1,
+    15000.00, 500.00, 'Calculo de teste - supervisor', GETDATE(), 1, 901, 'Supervisor Teste',
+    15000.00, 10000.00, 150.00, 2000.00
+FROM dbo.tblCampanhaTelevendas WHERE IDCampanhaTelevendas = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasResultado WHERE IDCampanhaTelevendas = 1 AND IDPessoaTelevendas = 1001)
+INSERT INTO dbo.tblCampanhaTelevendasResultado
+    (IDCampanhaTelevendas, DataCompetencia, DescricaoCampanha, IDPessoaTelevendas, NomeDigitador, Ranking,
+     ValorApurado, Premiacao, LogCalculo, DataCalculo, TipoPessoa, IDSupervisor, NomeSupervisor,
+     RealizadoTotal, ObjetivoIndividual, PercentualRealizadoIndividual, ValorApuradoBees)
+SELECT
+    1, DataCompetencia, 'Campanha Teste Positivacao', 1001, 'Digitador Teste', 1,
+    8000.00, 300.00, 'Calculo de teste - operador', GETDATE(), 2, 901, 'Supervisor Teste',
+    8000.00, 5000.00, 160.00, 1000.00
+FROM dbo.tblCampanhaTelevendas WHERE IDCampanhaTelevendas = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasResultado WHERE IDCampanhaTelevendas = 2 AND IDPessoaTelevendas = 901)
+INSERT INTO dbo.tblCampanhaTelevendasResultado
+    (IDCampanhaTelevendas, DataCompetencia, DescricaoCampanha, IDPessoaTelevendas, NomeDigitador, Ranking,
+     ValorApurado, Premiacao, LogCalculo, DataCalculo, TipoPessoa, IDSupervisor, NomeSupervisor,
+     RealizadoTotal, ObjetivoIndividual, PercentualRealizadoIndividual, ValorApuradoBees)
+SELECT
+    2, DataCompetencia, 'Campanha Teste Vendas', 901, 'Supervisor Teste', 1,
+    22000.00, 400.00, 'Calculo de teste - campanha fechada', GETDATE(), 1, 901, 'Supervisor Teste',
+    22000.00, 20000.00, 110.00, 3000.00
+FROM dbo.tblCampanhaTelevendas WHERE IDCampanhaTelevendas = 2;
+GO
+
+/* ---------- Parametros da campanha (Produto / Linha / Fabricante / Cliente) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasProduto WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasProduto (IDCampanhaTelevendas, IDProduto, Contem) VALUES
+(1, 701, 'S'), (1, 702, 'S'), (2, 701, 'S');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasLinhaProduto WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasLinhaProduto (IDCampanhaTelevendas, IDLinhaProduto, Contem) VALUES
+(1, 601, 'S'), (2, 601, 'S');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasFabricante WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasFabricante (IDCampanhaTelevendas, IDFabricante, Contem) VALUES
+(1, 501, 'S'), (2, 501, 'S');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasCliente WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasCliente (IDCampanhaTelevendas, IDCliente, Contem) VALUES
+(1, 801, 'S'), (1, 802, 'S'), (2, 801, 'S');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasDigitadora WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasDigitadora (IDCampanhaTelevendas, IDPessoaTelevendas, Contem) VALUES
+(1, 1001, 'S');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasCombo WHERE IDCampanhaTelevendas = 1)
+INSERT INTO dbo.tblCampanhaTelevendasCombo (IDCampanhaTelevendas, IDCombo, Contem) VALUES
+(1, 1101, 'S');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasDistincaoPessoaFabricante WHERE IDFabricante = 501 AND IDPessoa = 801)
+INSERT INTO dbo.tblCampanhaTelevendasDistincaoPessoaFabricante (IDFabricante, DescricaoFabricante, IDPessoa, IDDigitador) VALUES
+(501, 'Fabricante Teste LTDA', 801, 1001);
+GO
+
+/* ---------- Base de digitadoras (liga o vendedor "convencional" ao GUID usado no Sell-Out) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasBaseDigitadoras WHERE IDSupervisor = 901 AND IDPessoaTelevendas = 1001)
+INSERT INTO dbo.tblCampanhaTelevendasBaseDigitadoras
+    (IDSupervisor, NomeSupervisor, IDPessoaTelevendas, NomeDigitador, UsuarioDigitador, IDSetor) VALUES
+(901, 'Supervisor Teste', 1001, 'Digitador Teste', 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 1);
+GO
+
+/* ---------- Campanha comercial (legado, tabela sem controller ativo hoje) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaComercial WHERE IDCampanhaComercial = 1)
+BEGIN
+    SET IDENTITY_INSERT dbo.tblCampanhaComercial ON;
+    INSERT INTO dbo.tblCampanhaComercial (IDCampanhaComercial, NomeCampanha) VALUES (1, 'Campanha Comercial Teste');
+    SET IDENTITY_INSERT dbo.tblCampanhaComercial OFF;
+END
+GO
+
+/* ---------- Comissao por cliente/vendedor (exigida pelo JOIN + WHERE do relatorio de Sell-Out) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblComissaoVendasClienteVendedor WHERE IDCliente = 801)
+INSERT INTO dbo.tblComissaoVendasClienteVendedor (IDCliente, IDGerente, IDComissaoVendasCenario) VALUES
+(801, 1, 1),
+(802, 1, 1);
+GO
+
+/* ---------- Venda via Bees (segunda metade do UNION do relatorio de Sell-Out) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblVendasBees WHERE IDPedido = 9001 AND IDOperacao = 1)
+INSERT INTO dbo.tblVendasBees (IDPedido, IDOperacao, IDDigitador) VALUES
+(9001, 1, 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB');
+GO
+
+
+USE GS300BI;
+GO
+
+/* ---------- Vendas consolidadas (usadas no relatorio de Sell-Out) ----------
+   Uma linha "convencional" (branch 1 do UNION) e uma linha "Bees" (branch 2). */
+DECLARE @Hoje2      DATE = CAST(GETDATE() AS DATE);
+DECLARE @InicioMes2 DATE = DATEFROMPARTS(YEAR(@Hoje2), MONTH(@Hoje2), 1);
+DECLARE @DataVenda  DATETIME = DATEADD(DAY, 5, CAST(@InicioMes2 AS DATETIME));
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblConsolidacaoVendas WHERE IDPedido = 8001)
+INSERT INTO dbo.tblConsolidacaoVendas
+    (IDPedido, IDOperacao, IDProduto, IDProdutoLinha, IDPessoaCliente, IDPessoaVendedor,
+     IDPessoaFabricante, IDDigitador, IDOrigem, DataFaturamento, Quantidade, Total) VALUES
+(8001, 1, 701, 601, 801, 1001, 501, 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 1, @DataVenda, 10, 1500.00),
+(8002, 1, 702, 601, 802, 1001, 501, 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 1, @DataVenda, 5,  750.00);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblConsolidacaoVendas WHERE IDPedido = 9001)
+INSERT INTO dbo.tblConsolidacaoVendas
+    (IDPedido, IDOperacao, IDProduto, IDProdutoLinha, IDPessoaCliente, IDPessoaVendedor,
+     IDPessoaFabricante, IDDigitador, IDOrigem, DataFaturamento, Quantidade, Total) VALUES
+(9001, 1, 701, 601, 801, 1001, 501, 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB', 1, @DataVenda, 20, 3000.00);
+GO
+
+
+/* =====================================================================
+   5) COMO TESTAR CADA ROTA (execute a API apontando para GS300GP e use
+      os IDs de teste criados acima)
+   =====================================================================
+
+   GET  api/campaign                                  -> lista as 3 campanhas de teste
+   GET  api/campaign/1                                 -> campanha 1 (aberta)
+   GET  api/campaign/period?date=<DataCompetencia da campanha 1>  -> ver DataCompetencia gravada (SELECT DataCompetencia FROM GS300GP.dbo.tblCampanhaTelevendas WHERE IDCampanhaTelevendas = 1)
+
+   GET  Campaign/Params/Detail/fabricante/1            -> Fabricante Teste LTDA (501)
+   GET  Campaign/Params/Detail/linha/1                 -> Linha Higiene e Beleza (601)
+   GET  Campaign/Params/Detail/produto/1                -> Produto Teste 700ML / Sache (701/702)
+   GET  Campaign/Params/Detail/cliente/1?pageNumber=1&pageSize=10   -> Cliente 1 e 2 (801/802), paginado
+   GET  Campaign/Params/Detail/cliente/1?idCliente=801  -> filtra so o cliente 801
+
+   GET  api/campaign-summary?competenceDateFrom=<DataCompetencia da campanha 1>
+        -> retorna a campanha 1 (aberta), NAO retorna a campanha 3 (cancelada)
+   GET  api/campaign-summary/details/1                  -> detalhe supervisor (901) + operador (1001)
+
+   GET  api/campaign-summary-by-description?competenceDateFrom=<data>&description=Campanha Teste
+        -> (ajuste a rota conforme o controller de CampaignSummaryByDescription)
+
+   GET  api/campaign-result-report?competenceDateFrom=<DataCompetencia da campanha 1>
+        -> lista resultados de todas as campanhas nao canceladas a partir da data
+
+   POST/GET (conforme o controller) para Sell-Out, usando o corpo:
+     {
+       "idCampaign": 1,
+       "idOrigim": 1,
+       "isValidSellOutGC": true,
+       "startDate": "<DataInicioApuracao da campanha 1>",
+       "endDate": "<DataFimApuracao da campanha 1>",
+       "manufacturer": [{ "idManufacturer": 501 }],
+       "productLines": [{ "idProductLine": 601 }],
+       "products": [{ "idProduct": 701 }, { "idProduct": 702 }],
+       "clients": [{ "idClients": 801 }, { "idClients": 802 }]
+     }
+     -> retorna 2 linhas: uma da venda "convencional" (pedido 8001/8002, vendedor
+        "Vendedor Teste Convencional") e uma da venda "Bees" (pedido 9001, vendedor
+        "Vendedor Teste Bees").
+   ===================================================================== */
