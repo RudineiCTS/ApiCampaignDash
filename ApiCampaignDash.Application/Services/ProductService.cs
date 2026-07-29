@@ -21,5 +21,18 @@ namespace ApiCampaignDash.Application.Services
             var products = await _repository.GetByCampaignIdAsync(idCampaign);
             return _mapper.Map<IEnumerable<ProductDto>>(products);
         }
+
+        public async Task<PagedResultDto<ProductDto>> GetByCampaignIdPagedAsync(int idCampaign, int? idProduct, int pageNumber, int pageSize)
+        {
+            var (items, totalCount) = await _repository.GetByCampaignIdPagedAsync(idCampaign, idProduct, pageNumber, pageSize);
+
+            return new PagedResultDto<ProductDto>
+            {
+                Items = _mapper.Map<IEnumerable<ProductDto>>(items),
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
     }
 }
