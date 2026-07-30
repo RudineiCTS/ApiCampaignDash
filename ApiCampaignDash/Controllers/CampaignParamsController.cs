@@ -1,3 +1,4 @@
+using System.Text;
 using ApiCampaignDash.Application.DTOs;
 using ApiCampaignDash.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -57,6 +58,24 @@ namespace ApiCampaignDash.Controllers
             return Ok(result);
         }
 
+        // GET: Campaign/Params/Detail/produto/5/todos
+        [HttpGet("produto/{idCampaign:int}/todos")]
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetAllProducts(int idCampaign)
+        {
+            var result = await _productService.GetByCampaignIdAsync(idCampaign);
+            return Ok(result);
+        }
+
+        // GET: Campaign/Params/Detail/produto/5/arquivo
+        [HttpGet("produto/{idCampaign:int}/arquivo")]
+        public async Task<IActionResult> GetProductsFile(int idCampaign)
+        {
+            var products = await _productService.GetByCampaignIdAsync(idCampaign);
+            var csvBytes = BuildProductsCsv(products);
+
+            return File(csvBytes, "text/csv", $"produtos_campanha_{idCampaign}.csv");
+        }
+
         // GET: Campaign/Params/Detail/cliente/5?idCliente=123&pageNumber=1&pageSize=50
         [HttpGet("cliente/{idCampaign:int}")]
         public async Task<ActionResult<PagedResultDto<ClientsDto>>> GetClients(
@@ -71,6 +90,76 @@ namespace ApiCampaignDash.Controllers
 
             var result = await _clientsService.GetByCampaignIdPagedAsync(idCampaign, idCliente, pageNumber, pageSize);
             return Ok(result);
+        }
+
+        // GET: Campaign/Params/Detail/cliente/5/todos
+        [HttpGet("cliente/{idCampaign:int}/todos")]
+        public async Task<ActionResult<IEnumerable<ClientsDto>>> GetAllClients(int idCampaign)
+        {
+            var result = await _clientsService.GetByCampaignIdAsync(idCampaign);
+            return Ok(result);
+        }
+
+        // GET: Campaign/Params/Detail/cliente/5/arquivo
+        [HttpGet("cliente/{idCampaign:int}/arquivo")]
+        public async Task<IActionResult> GetClientsFile(int idCampaign)
+        {
+            var clients = await _clientsService.GetByCampaignIdAsync(idCampaign);
+            var csvBytes = BuildClientsCsv(clients);
+
+            return File(csvBytes, "text/csv", $"clientes_campanha_{idCampaign}.csv");
+        }
+
+        private static byte[] BuildClientsCsv(IEnumerable<ClientsDto> clients)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("IdCampaign;IdClients;ClientName;CpfCnpj;City;State;IsValid");
+
+            foreach (var client in clients)
+            {
+                builder.AppendLine(string.Join(";",
+                    client.IdCampaign,
+                    client.IdClients,
+                    EscapeCsvField(client.ClientName),
+                    EscapeCsvField(client.CpfCnpj),
+                    EscapeCsvField(client.City),
+                    EscapeCsvField(client.State),
+                    EscapeCsvField(client.IsValid)));
+            }
+
+            var preamble = Encoding.UTF8.GetPreamble();
+            var content = Encoding.UTF8.GetBytes(builder.ToString());
+            return [.. preamble, .. content];
+        }
+
+        private static byte[] BuildProductsCsv(IEnumerable<ProductDto> products)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("IdCampaign;IdProduct;Name;IsValid");
+
+            foreach (var product in products)
+            {
+                builder.AppendLine(string.Join(";",
+                    product.IdCampaign,
+                    product.IdProduct,
+                    EscapeCsvField(product.Name),
+                    EscapeCsvField(product.IsValid)));
+            }
+
+            var preamble = Encoding.UTF8.GetPreamble();
+            var content = Encoding.UTF8.GetBytes(builder.ToString());
+            return [.. preamble, .. content];
+        }
+
+        private static string EscapeCsvField(string? field)
+        {
+            if (string.IsNullOrEmpty(field))
+                return string.Empty;
+
+            if (field.Contains(';') || field.Contains('"') || field.Contains('\n'))
+                return $"\"{field.Replace("\"", "\"\"")}\"";
+
+            return field;
         }
     }
 }
