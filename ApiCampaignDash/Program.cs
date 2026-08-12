@@ -35,6 +35,8 @@ builder.Services.AddScoped<IClientsRepository, ClientsRepository>();
 builder.Services.AddScoped<IClientsService, ClientsService>();
 builder.Services.AddScoped<ICampaignResumeSellOutRepository, CampaignResumeSellOutRepository>();
 builder.Services.AddScoped<ICampaignResumeSellOutService, CampaignResumeSellOutService>();
+builder.Services.AddScoped<ISellOutSummaryRepository, SellOutSummaryRepository>();
+builder.Services.AddScoped<ISellOutSummaryService, SellOutSummaryService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
