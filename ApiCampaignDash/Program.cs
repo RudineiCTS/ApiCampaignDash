@@ -37,6 +37,8 @@ builder.Services.AddScoped<ICampaignResumeSellOutRepository, CampaignResumeSellO
 builder.Services.AddScoped<ICampaignResumeSellOutService, CampaignResumeSellOutService>();
 builder.Services.AddScoped<ISellOutSummaryRepository, SellOutSummaryRepository>();
 builder.Services.AddScoped<ISellOutSummaryService, SellOutSummaryService>();
+builder.Services.AddScoped<IDynamicReportRepository, DynamicReportRepository>();
+builder.Services.AddScoped<IDynamicReportService, DynamicReportService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
