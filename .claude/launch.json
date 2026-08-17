@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dash-electron",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--prefix", "C:/Users/rudinei.cferreira/www/dash-electron"],
+      "port": 5173
+    }
+  ]
+}
