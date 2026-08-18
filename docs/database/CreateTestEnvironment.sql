@@ -422,12 +422,19 @@ CREATE TABLE dbo.tblConsolidacaoVendas
     IDPessoaCliente     INT NULL,
     IDPessoaVendedor    INT NULL,
     IDPessoaFabricante  INT NULL,
+    IDPessoaGerente     INT NULL,
     IDDigitador         UNIQUEIDENTIFIER NULL,
     IDOrigem            INT NULL,
     DataFaturamento     DATETIME NULL,
     Quantidade          INT NULL,
     Total               DECIMAL(18,2) NULL
 );
+GO
+
+/* Upgrade idempotente: quem ja rodou a versao anterior deste script nao tinha esta
+   coluna, usada direto por SellOutSummaryRepository (tblConVen.IDPessoaGerente <> 159452). */
+IF COL_LENGTH('dbo.tblConsolidacaoVendas', 'IDPessoaGerente') IS NULL
+    ALTER TABLE dbo.tblConsolidacaoVendas ADD IDPessoaGerente INT NULL;
 GO
 
 
@@ -491,6 +498,107 @@ IF NOT EXISTS (SELECT 1 FROM dbo.tblSegUsuario WHERE IDUsuario = 'AAAAAAAA-AAAA-
 INSERT INTO dbo.tblSegUsuario (IDUsuario, NomeUsuario) VALUES
 ('AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 'Vendedor Teste Convencional'),
 ('BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB', 'Vendedor Teste Bees');
+GO
+
+
+/* =====================================================================
+   4-B) MASSA DE DADOS ADICIONAL (mais rica) - cobre os relatorios novos
+   (DynamicReportController, SellOutSummaryController) que precisam de
+   varios fabricantes/linhas/produtos/clientes/vendedores/meses para que
+   agrupamentos, filtros e as regras de exclusao fixas no codigo
+   (IDGerente <> 159452 e IDDigitador Bees <> 'ce782385-...') facam sentido.
+   Nao mexe nos dados minimos criados acima (IDs 501/801/802/601/701/702/
+   901/1001/1..3), apenas complementa com IDs novos.
+   ===================================================================== */
+
+/* ---------- Mais fabricantes (Pessoa Juridica) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwPessoaFisicaJuridica WHERE IDPessoa = 502)
+INSERT INTO dbo.uvwPessoaFisicaJuridica (IDPessoa, CpfCnpj, RazaoSocial, Nome) VALUES
+(502, '22333444000155', 'Fabricante Beta Higiene LTDA', 'Fabricante Beta Higiene LTDA'),
+(503, '33444555000166', 'Fabricante Gama Alimentos LTDA', 'Fabricante Gama Alimentos LTDA'),
+(504, '44555666000177', 'Fabricante Delta Farma LTDA', 'Fabricante Delta Farma LTDA');
+GO
+
+/* ---------- Gerentes (Pessoa) - inclui o ID 159452, excluido por regra fixa no codigo
+   (ver "DANIEL CAMPOS PRESTE" em CampaignResumeSellOutRepository, DynamicReportRepository
+   e SellOutSummaryRepository) para permitir testar que ele SOME dos relatorios. ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwPessoaFisicaJuridica WHERE IDPessoa = 201)
+INSERT INTO dbo.uvwPessoaFisicaJuridica (IDPessoa, CpfCnpj, RazaoSocial, Nome) VALUES
+(201, '11111111111', NULL, 'Gerente Regional Sul'),
+(202, '22222222222', NULL, 'Gerente Regional Sudeste'),
+(159452, '33333333333', NULL, 'Daniel Campos Preste');
+GO
+
+/* ---------- Mais clientes (Pessoa) - 803 a 815 (13 clientes adicionais) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwPessoaFisicaJuridica WHERE IDPessoa = 803)
+INSERT INTO dbo.uvwPessoaFisicaJuridica (IDPessoa, CpfCnpj, RazaoSocial, Nome)
+SELECT
+    IDCliente,
+    RIGHT('00000000000' + CAST(IDCliente AS VARCHAR(11)), 11),
+    'Cliente Teste ' + CAST(IDCliente - 800 AS VARCHAR(3)) + ' LTDA',
+    'Cliente Teste ' + CAST(IDCliente - 800 AS VARCHAR(3))
+FROM (SELECT 803 + n AS IDCliente FROM (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)) AS v(n)) x;
+GO
+
+/* ---------- Mais linhas de produto ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblProdutoLinha WHERE IDProdutoLinha = 602)
+INSERT INTO dbo.tblProdutoLinha (IDProdutoLinha, DescProdutoLinha) VALUES
+(602, 'Linha Alimentos'),
+(603, 'Linha Farma'),
+(604, 'Linha Limpeza'),
+(605, 'Linha Bebidas');
+GO
+
+/* ---------- Mais produtos (703 a 715), distribuidos entre as 5 linhas ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.vwProduto WHERE IDProduto = 703)
+INSERT INTO dbo.vwProduto (IDProduto, DescProduto, CodBarras)
+SELECT
+    IDProduto,
+    'Produto Teste ' + CAST(IDProduto - 700 AS VARCHAR(3)),
+    '789123456' + RIGHT('0000' + CAST(IDProduto AS VARCHAR(4)), 4)
+FROM (SELECT 703 + n AS IDProduto FROM (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)) AS v(n)) x;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblProduto WHERE IDProduto = 703)
+INSERT INTO dbo.tblProduto (IDProduto, DescProduto)
+SELECT IDProduto, DescProduto FROM dbo.vwProduto WHERE IDProduto BETWEEN 703 AND 715;
+GO
+
+/* ---------- Clientes com dados completos (703 a 715 nao se aplica aqui; 803 a 815) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.uvwClienteOutrasInformacoes WHERE IDCliente = 803)
+INSERT INTO dbo.uvwClienteOutrasInformacoes (IDCliente, NomeCliente, CPF_CNPJ, DescCidade, UFCidade)
+SELECT
+    IDCliente,
+    'Cliente Teste ' + CAST(IDCliente - 800 AS VARCHAR(3)),
+    RIGHT('00000000000' + CAST(IDCliente AS VARCHAR(11)), 11),
+    cidade.DescCidade,
+    cidade.UFCidade
+FROM (SELECT 803 + n AS IDCliente, n FROM (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)) AS v(n)) x
+CROSS APPLY (
+    SELECT * FROM (VALUES
+        (0, 'Sao Paulo', 'SP'), (1, 'Rio de Janeiro', 'RJ'), (2, 'Belo Horizonte', 'MG'),
+        (3, 'Curitiba', 'PR'), (4, 'Porto Alegre', 'RS')
+    ) AS c(Seq, DescCidade, UFCidade)
+    WHERE c.Seq = x.n % 5
+) cidade;
+GO
+
+/* ---------- Mais vendedores/operadores (Sell-Out e Dynamic Report) ----------
+   1002 a 1006: canal Televendas (precisam existir tambem em
+   tblCampanhaTelevendasBaseDigitadoras.UsuarioDigitador, inserido mais abaixo).
+   Canal Bees: mais um vendedor "normal" e a GUID FIXA excluida no codigo
+   ('ce782385-bece-485b-9e33-05ec60591610' = "BRENDA EXCLUSIVA GRANDES CONTAS"),
+   incluida de proposito para permitir testar que ela SOME dos relatorios
+   quando ConsideraGrandesContas = false. ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblSegUsuario WHERE IDUsuario = '11111111-1111-1111-1111-111111111002')
+INSERT INTO dbo.tblSegUsuario (IDUsuario, NomeUsuario) VALUES
+('11111111-1111-1111-1111-111111111002', 'Operador Televendas 2'),
+('11111111-1111-1111-1111-111111111003', 'Operador Televendas 3'),
+('11111111-1111-1111-1111-111111111004', 'Operador Televendas 4'),
+('11111111-1111-1111-1111-111111111005', 'Operador Televendas 5'),
+('11111111-1111-1111-1111-111111111006', 'Operador Televendas 6'),
+('22222222-2222-2222-2222-222222222002', 'Vendedor Bees Convencional 2'),
+('ce782385-bece-485b-9e33-05ec60591610', 'Brenda Exclusiva Grandes Contas');
 GO
 
 
@@ -685,6 +793,152 @@ INSERT INTO dbo.tblVendasBees (IDPedido, IDOperacao, IDDigitador) VALUES
 GO
 
 
+/* ---------- Mais supervisores/operadores (902/903), completando a base de digitadoras ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasBaseDigitadoras WHERE IDSupervisor = 901 AND IDPessoaTelevendas = 1002)
+INSERT INTO dbo.tblCampanhaTelevendasBaseDigitadoras
+    (IDSupervisor, NomeSupervisor, IDPessoaTelevendas, NomeDigitador, UsuarioDigitador, IDSetor) VALUES
+(901, 'Supervisor Teste',    1002, 'Operador Televendas 2', '11111111-1111-1111-1111-111111111002', 1),
+(902, 'Supervisor Sudeste',  1003, 'Operador Televendas 3', '11111111-1111-1111-1111-111111111003', 2),
+(902, 'Supervisor Sudeste',  1004, 'Operador Televendas 4', '11111111-1111-1111-1111-111111111004', 2),
+(903, 'Supervisor Nordeste', 1005, 'Operador Televendas 5', '11111111-1111-1111-1111-111111111005', 3),
+(903, 'Supervisor Nordeste', 1006, 'Operador Televendas 6', '11111111-1111-1111-1111-111111111006', 3);
+GO
+
+/* ---------- Campanhas 4 (cancelada, tipo Positivacao Especifica) e 5 (fechada, ha 2 meses) ----------
+   Campanha 4 existe so para confirmar que campanhas canceladas (situacao=4) continuam
+   fora do /campaign-summary e do /campaign-result-report, igual a campanha 3.
+   Campanha 5 tem 3 supervisores x 2 operadores com ValorApurado, para dar volume e
+   ranking real ao teste de faixa de premiacao. ---------- */
+DECLARE @HojeB DATE = CAST(GETDATE() AS DATE);
+DECLARE @InicioMesAtualB DATE = DATEFROMPARTS(YEAR(@HojeB), MONTH(@HojeB), 1);
+DECLARE @InicioMesAnteriorB DATE = DATEADD(MONTH, -1, @InicioMesAtualB);
+DECLARE @FimMesAnteriorB DATE = EOMONTH(@InicioMesAnteriorB);
+DECLARE @InicioDoisMesesB DATE = DATEADD(MONTH, -2, @InicioMesAtualB);
+DECLARE @FimDoisMesesB DATE = EOMONTH(@InicioDoisMesesB);
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendas WHERE IDCampanhaTelevendas = 4)
+BEGIN
+    SET IDENTITY_INSERT dbo.tblCampanhaTelevendas ON;
+
+    INSERT INTO dbo.tblCampanhaTelevendas
+        (IDCampanhaTelevendas, DataCompetencia, IDCampanhaTelevendasPeriodoCompetenciaSituacao,
+         DataInicioApuracao, DataFimApuracao, TotalRanking, DescricaoCampanha,
+         IDCampanhaTelevendasTipoApuracao, IDCampanhaTelevendasTipoCalculo, RegraValidacao,
+         TipoValor, DataFimAntecipada, Observacao, ConsideraExclusivas, TipoCampanhaTelevendas, Dinamica)
+    VALUES
+        (4, @InicioMesAnteriorB, 4,
+         @InicioMesAnteriorB, @FimMesAnteriorB, 10, 'Campanha Teste Positivacao Especifica Cancelada',
+         6, 1, NULL,
+         1, NULL, 'Campanha de teste - cancelada (deve ser ignorada no resumo)', 0, 0, 0),
+
+        (5, @InicioDoisMesesB, 2,
+         @InicioDoisMesesB, @FimDoisMesesB, 15, 'Campanha Teste Vendas Dois Meses Atras',
+         2, 1, NULL,
+         1, NULL, 'Campanha de teste - fechada, ha dois meses, com ranking completo', 0, 0, 1);
+
+    SET IDENTITY_INSERT dbo.tblCampanhaTelevendas OFF;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasMeta WHERE IDCampanhaTelevendas = 4)
+INSERT INTO dbo.tblCampanhaTelevendasMeta (IDCampanhaTelevendas, MetaValor, GatilhoPositivacao, GatilhoVenda) VALUES
+(4, 12000.00, 6000.00, 6000.00),
+(5, 25000.00, 10000.00, 10000.00);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasFaixaPremiacao WHERE IDCampanhaTelevendas = 5)
+INSERT INTO dbo.tblCampanhaTelevendasFaixaPremiacao
+    (IDCampanhaTelevendas, ValorInicio, ValorFim, RankingInicio, RankingFim, PremioValor, LimitePremio, TipoPessoa) VALUES
+(5, 0.00, 10000.00,     1, 5,  350.00, 1000.00, 1),
+(5, 10000.01, 999999.00, 6, 15, 600.00, 1800.00, 1),
+(5, 0.00, 999999.00,    1, 15, 200.00, 800.00,  2);
+GO
+
+/* ---------- Resultado apurado da campanha 5: 3 supervisores + 6 operadores, com ranking ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasResultado WHERE IDCampanhaTelevendas = 5 AND IDPessoaTelevendas = 901)
+INSERT INTO dbo.tblCampanhaTelevendasResultado
+    (IDCampanhaTelevendas, DataCompetencia, DescricaoCampanha, IDPessoaTelevendas, NomeDigitador, Ranking,
+     ValorApurado, Premiacao, LogCalculo, DataCalculo, TipoPessoa, IDSupervisor, NomeSupervisor,
+     RealizadoTotal, ObjetivoIndividual, PercentualRealizadoIndividual, ValorApuradoBees)
+SELECT
+    c.IDCampanhaTelevendas, c.DataCompetencia, c.DescricaoCampanha, r.IDPessoaTelevendas, r.NomeDigitador, r.Ranking,
+    r.ValorApurado, r.Premiacao, r.LogCalculo, GETDATE(), r.TipoPessoa, r.IDSupervisor, r.NomeSupervisor,
+    r.ValorApurado, r.ObjetivoIndividual,
+    CASE WHEN r.ObjetivoIndividual = 0 THEN 0 ELSE CAST(r.ValorApurado / r.ObjetivoIndividual * 100 AS DECIMAL(18,2)) END,
+    r.ValorApuradoBees
+FROM dbo.tblCampanhaTelevendas c
+CROSS JOIN (VALUES
+    (901,  'Supervisor Teste',       901, 'Supervisor Teste',       1, 1, 32000.00, 800.00, 20000.00, 4000.00, 'Calculo de teste - supervisor Teste'),
+    (902,  'Supervisor Sudeste',     902, 'Supervisor Sudeste',     1, 2, 28000.00, 600.00, 18000.00, 3500.00, 'Calculo de teste - supervisor Sudeste'),
+    (903,  'Supervisor Nordeste',    903, 'Supervisor Nordeste',    1, 3, 24000.00, 500.00, 16000.00, 3000.00, 'Calculo de teste - supervisor Nordeste'),
+    (1001, 'Digitador Teste',        901, 'Supervisor Teste',       2, 1, 12000.00, 350.00, 8000.00,  1500.00, 'Calculo de teste - operador 1'),
+    (1002, 'Operador Televendas 2',  901, 'Supervisor Teste',       2, 2, 11000.00, 300.00, 8000.00,  1300.00, 'Calculo de teste - operador 2'),
+    (1003, 'Operador Televendas 3',  902, 'Supervisor Sudeste',     2, 3, 10500.00, 280.00, 8000.00,  1200.00, 'Calculo de teste - operador 3'),
+    (1004, 'Operador Televendas 4',  902, 'Supervisor Sudeste',     2, 4, 9800.00,  260.00, 8000.00,  1100.00, 'Calculo de teste - operador 4'),
+    (1005, 'Operador Televendas 5',  903, 'Supervisor Nordeste',    2, 5, 9200.00,  240.00, 8000.00,  1000.00, 'Calculo de teste - operador 5'),
+    (1006, 'Operador Televendas 6',  903, 'Supervisor Nordeste',    2, 6, 8700.00,  220.00, 8000.00,  900.00,  'Calculo de teste - operador 6')
+) AS r(IDPessoaTelevendas, NomeDigitador, IDSupervisor, NomeSupervisor, TipoPessoa, Ranking, ValorApurado, Premiacao, ObjetivoIndividual, ValorApuradoBees, LogCalculo)
+WHERE c.IDCampanhaTelevendas = 5;
+GO
+
+/* ---------- Metas individuais da campanha 5 (uma por operador) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasMetaInd WHERE IDCampanhaTelevendas = 5 AND IDPessoa = 1001)
+INSERT INTO dbo.tblCampanhaTelevendasMetaInd (IDCampanhaTelevendas, IDPessoa, IDSupervisor, TipoPessoa, MetaValor, Gatilho, IDGerente) VALUES
+(5, 1001, 901, 2, 8000.00, 4000.00, 201),
+(5, 1002, 901, 2, 8000.00, 4000.00, 201),
+(5, 1003, 902, 2, 8000.00, 4000.00, 202),
+(5, 1004, 902, 2, 8000.00, 4000.00, 202),
+(5, 1005, 903, 2, 8000.00, 4000.00, 159452),
+(5, 1006, 903, 2, 8000.00, 4000.00, 159452);
+GO
+
+/* ---------- Escopo da campanha 5 (todos os fabricantes/linhas/produtos/clientes/digitadoras) ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasFabricante WHERE IDCampanhaTelevendas = 5)
+INSERT INTO dbo.tblCampanhaTelevendasFabricante (IDCampanhaTelevendas, IDFabricante, Contem)
+SELECT 5, IDFabricante, 'S' FROM (VALUES (501),(502),(503),(504)) AS f(IDFabricante);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasLinhaProduto WHERE IDCampanhaTelevendas = 5)
+INSERT INTO dbo.tblCampanhaTelevendasLinhaProduto (IDCampanhaTelevendas, IDLinhaProduto, Contem)
+SELECT 5, IDLinhaProduto, 'S' FROM (VALUES (601),(602),(603),(604),(605)) AS l(IDLinhaProduto);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasProduto WHERE IDCampanhaTelevendas = 5)
+INSERT INTO dbo.tblCampanhaTelevendasProduto (IDCampanhaTelevendas, IDProduto, Contem)
+SELECT 5, 700 + n, 'S' FROM (VALUES(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15)) AS p(n);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasCliente WHERE IDCampanhaTelevendas = 5)
+INSERT INTO dbo.tblCampanhaTelevendasCliente (IDCampanhaTelevendas, IDCliente, Contem)
+SELECT 5, 800 + n, 'S' FROM (VALUES(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15)) AS c(n);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasDigitadora WHERE IDCampanhaTelevendas = 5)
+INSERT INTO dbo.tblCampanhaTelevendasDigitadora (IDCampanhaTelevendas, IDPessoaTelevendas, Contem)
+SELECT 5, 1000 + n, 'S' FROM (VALUES(1),(2),(3),(4),(5),(6)) AS d(n);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tblCampanhaTelevendasRegraValidacao WHERE IDCampanhaTelevendas = 5 AND IDCampanhaTelevendasValidar = 2)
+INSERT INTO dbo.tblCampanhaTelevendasRegraValidacao (IDCampanhaTelevendas, IDCampanhaTelevendasValidar, ResultadoValidacao) VALUES
+(5, 2, 'OK');
+GO
+
+/* ---------- Comissao dos novos clientes (803 a 815) ----------
+   801-805 -> gerente 201 | 806-810 -> gerente 202 | 811-815 -> gerente 159452 (EXCLUIDO por
+   regra fixa no codigo). Cenario sempre 1, pois o stub de fnObterIDComissaoVendasCenario
+   sempre retorna 1. ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblComissaoVendasClienteVendedor WHERE IDCliente = 803)
+INSERT INTO dbo.tblComissaoVendasClienteVendedor (IDCliente, IDGerente, IDComissaoVendasCenario)
+SELECT
+    IDCliente,
+    CASE WHEN IDCliente BETWEEN 801 AND 805 THEN 201
+         WHEN IDCliente BETWEEN 806 AND 810 THEN 202
+         ELSE 159452 END,
+    1
+FROM (SELECT 803 + n AS IDCliente FROM (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)) AS v(n)) x;
+GO
+
+
 USE GS300BI;
 GO
 
@@ -700,13 +954,154 @@ INSERT INTO dbo.tblConsolidacaoVendas
      IDPessoaFabricante, IDDigitador, IDOrigem, DataFaturamento, Quantidade, Total) VALUES
 (8001, 1, 701, 601, 801, 1001, 501, 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 1, @DataVenda, 10, 1500.00),
 (8002, 1, 702, 601, 802, 1001, 501, 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA', 1, @DataVenda, 5,  750.00);
-GO
+/* sem GO aqui de proposito: @DataVenda precisa continuar no escopo (era um bug do
+   script original - o GO fechava o batch e o INSERT do pedido 9001 abaixo falhava
+   com "e necessario declarar a variavel escalar @DataVenda") */
 
 IF NOT EXISTS (SELECT 1 FROM dbo.tblConsolidacaoVendas WHERE IDPedido = 9001)
 INSERT INTO dbo.tblConsolidacaoVendas
     (IDPedido, IDOperacao, IDProduto, IDProdutoLinha, IDPessoaCliente, IDPessoaVendedor,
      IDPessoaFabricante, IDDigitador, IDOrigem, DataFaturamento, Quantidade, Total) VALUES
 (9001, 1, 701, 601, 801, 1001, 501, 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB', 1, @DataVenda, 20, 3000.00);
+GO
+
+/* ---------- Vendas Televendas ricas (canal 1) para DynamicReportController e SellOutSummaryController ----------
+   Cobre os 15 clientes, 15 produtos, 4 fabricantes e 6 operadores criados na secao 4-B,
+   distribuidos nos ultimos 3 meses (mes atual, anterior e retrasado). Inclui de proposito
+   pedidos de clientes cujo gerente e o ID 159452 (EXCLUIDO por regra fixa no codigo em
+   CampaignResumeSellOutRepository/DynamicReportRepository/SellOutSummaryRepository), para
+   permitir confirmar que eles somem dos relatorios. ---------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.tblConsolidacaoVendas WHERE IDPedido = 8100)
+BEGIN
+    DECLARE @InicioMesAtualC DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+
+    ;WITH Clientes AS (
+        SELECT * FROM (VALUES
+            (1,801),(2,802),(3,803),(4,804),(5,805),(6,806),(7,807),(8,808),(9,809),(10,810),
+            (11,811),(12,812),(13,813),(14,814),(15,815)
+        ) AS C(Seq, IDCliente)
+    ),
+    Produtos AS (
+        SELECT * FROM (VALUES
+            (1,701,601),(2,702,602),(3,703,603),(4,704,604),(5,705,605),
+            (6,706,601),(7,707,602),(8,708,603),(9,709,604),(10,710,605),
+            (11,711,601),(12,712,602),(13,713,603),(14,714,604),(15,715,605)
+        ) AS P(Seq, IDProduto, IDProdutoLinha)
+    ),
+    Fabricantes AS (
+        SELECT * FROM (VALUES (1,501),(2,502),(3,503),(4,504)) AS F(Seq, IDFabricante)
+    ),
+    Operadores AS (
+        SELECT * FROM (VALUES
+            (1, CAST('11111111-1111-1111-1111-111111111001' AS UNIQUEIDENTIFIER)),
+            (2, CAST('11111111-1111-1111-1111-111111111002' AS UNIQUEIDENTIFIER)),
+            (3, CAST('11111111-1111-1111-1111-111111111003' AS UNIQUEIDENTIFIER)),
+            (4, CAST('11111111-1111-1111-1111-111111111004' AS UNIQUEIDENTIFIER)),
+            (5, CAST('11111111-1111-1111-1111-111111111005' AS UNIQUEIDENTIFIER)),
+            (6, CAST('11111111-1111-1111-1111-111111111006' AS UNIQUEIDENTIFIER))
+        ) AS O(Seq, IDDigitador)
+    ),
+    Meses AS (
+        SELECT 0 AS MesOffset UNION ALL SELECT 1 UNION ALL SELECT 2
+    ),
+    Combos AS (
+        SELECT
+            c.Seq AS ClienteSeq, c.IDCliente,
+            p.Seq AS ProdutoSeq, p.IDProduto, p.IDProdutoLinha,
+            fa.IDFabricante,
+            op.IDDigitador,
+            m.MesOffset,
+            CASE WHEN c.IDCliente BETWEEN 801 AND 805 THEN 201
+                 WHEN c.IDCliente BETWEEN 806 AND 810 THEN 202
+                 ELSE 159452 END AS IDGerente,
+            ROW_NUMBER() OVER (ORDER BY m.MesOffset, c.Seq, p.Seq) AS RowSeq
+        FROM Clientes c
+        CROSS JOIN Produtos p
+        CROSS JOIN Meses m
+        CROSS APPLY (SELECT IDFabricante FROM Fabricantes WHERE Seq = ((c.Seq + p.Seq) % 4) + 1) fa
+        CROSS APPLY (SELECT IDDigitador FROM Operadores WHERE Seq = ((c.Seq + p.Seq) % 6) + 1) op
+        WHERE (c.Seq + p.Seq) % 4 = 0
+    )
+    INSERT INTO dbo.tblConsolidacaoVendas
+        (IDPedido, IDOperacao, IDProduto, IDProdutoLinha, IDPessoaCliente, IDPessoaVendedor,
+         IDPessoaFabricante, IDPessoaGerente, IDDigitador, IDOrigem, DataFaturamento, Quantidade, Total)
+    SELECT
+        8100 + cb.RowSeq,
+        1,
+        cb.IDProduto,
+        cb.IDProdutoLinha,
+        cb.IDCliente,
+        NULL,
+        cb.IDFabricante,
+        cb.IDGerente,
+        cb.IDDigitador,
+        1,
+        DATEADD(DAY, (cb.ClienteSeq + cb.ProdutoSeq) % 25, DATEADD(MONTH, -cb.MesOffset, @InicioMesAtualC)),
+        2 + ((cb.ClienteSeq + cb.ProdutoSeq) % 8),
+        CAST((2 + ((cb.ClienteSeq + cb.ProdutoSeq) % 8)) * (35.00 + ((cb.ProdutoSeq * 7) % 50)) AS DECIMAL(18,2))
+    FROM Combos cb;
+END
+GO
+
+/* ---------- Vendas Bees ricas (canal 2) ----------
+   Mesmos clientes/produtos, deslocamento diferente no modulo, cobrindo os 2 meses mais
+   recentes. Para os clientes 811 a 815 (gerente 159452, ja excluido), metade dos pedidos
+   usa de proposito a GUID 'ce782385-bece-485b-9e33-05ec60591610' (vendedora Bees excluida
+   por regra fixa no codigo, exceto quando ConsideraGrandesContas = true), permitindo testar
+   as duas regras de exclusao juntas e separadas. ---------- */
+IF NOT EXISTS (SELECT 1 FROM GS300GP.dbo.tblVendasBees WHERE IDPedido = 9100)
+BEGIN
+    DECLARE @InicioMesAtualD DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY m.MesOffset, c.Seq, p.Seq) AS RowSeq,
+        c.Seq AS ClienteSeq, c.IDCliente,
+        p.Seq AS ProdutoSeq, p.IDProduto, p.IDProdutoLinha,
+        fa.IDFabricante,
+        CASE
+            WHEN c.IDCliente BETWEEN 811 AND 815 AND ((c.Seq + p.Seq) % 2 = 0)
+                THEN CAST('ce782385-bece-485b-9e33-05ec60591610' AS UNIQUEIDENTIFIER)
+            WHEN ((c.Seq + p.Seq) % 2 = 0)
+                THEN CAST('22222222-2222-2222-2222-222222222001' AS UNIQUEIDENTIFIER)
+            ELSE CAST('22222222-2222-2222-2222-222222222002' AS UNIQUEIDENTIFIER)
+        END AS IDDigitador,
+        m.MesOffset,
+        CASE WHEN c.IDCliente BETWEEN 801 AND 805 THEN 201
+             WHEN c.IDCliente BETWEEN 806 AND 810 THEN 202
+             ELSE 159452 END AS IDGerente
+    INTO #VendasBees
+    FROM (SELECT * FROM (VALUES
+            (1,801),(2,802),(3,803),(4,804),(5,805),(6,806),(7,807),(8,808),(9,809),(10,810),
+            (11,811),(12,812),(13,813),(14,814),(15,815)
+        ) AS C(Seq, IDCliente)) c
+    CROSS JOIN (SELECT * FROM (VALUES
+            (1,701,601),(2,702,602),(3,703,603),(4,704,604),(5,705,605),
+            (6,706,601),(7,707,602),(8,708,603),(9,709,604),(10,710,605),
+            (11,711,601),(12,712,602),(13,713,603),(14,714,604),(15,715,605)
+        ) AS P(Seq, IDProduto, IDProdutoLinha)) p
+    CROSS JOIN (SELECT 0 AS MesOffset UNION ALL SELECT 1) m
+    CROSS APPLY (SELECT IDFabricante FROM (VALUES (1,501),(2,502),(3,503),(4,504)) AS F(Seq, IDFabricante) WHERE Seq = ((c.Seq + p.Seq) % 4) + 1) fa
+    WHERE (c.Seq + p.Seq) % 4 = 2;
+
+    /* tblVendasBees mora no banco GS300GP (mesmo banco da conexao da API - por isso o
+       codigo real referencia ela sem prefixo de schema/banco), mas este trecho roda com
+       o contexto em GS300BI (para inserir em tblConsolidacaoVendas na sequencia), entao
+       precisa do nome de 3 partes aqui. */
+    INSERT INTO GS300GP.dbo.tblVendasBees (IDPedido, IDOperacao, IDDigitador)
+    SELECT 9100 + RowSeq, 1, IDDigitador FROM #VendasBees;
+
+    INSERT INTO dbo.tblConsolidacaoVendas
+        (IDPedido, IDOperacao, IDProduto, IDProdutoLinha, IDPessoaCliente, IDPessoaVendedor,
+         IDPessoaFabricante, IDPessoaGerente, IDDigitador, IDOrigem, DataFaturamento, Quantidade, Total)
+    SELECT
+        9100 + RowSeq, 1, IDProduto, IDProdutoLinha, IDCliente, NULL, IDFabricante, IDGerente, IDDigitador, 2,
+        DATEADD(DAY, (ClienteSeq + ProdutoSeq) % 25, DATEADD(MONTH, -MesOffset, @InicioMesAtualD)),
+        1 + ((ClienteSeq + ProdutoSeq) % 6),
+        CAST((1 + ((ClienteSeq + ProdutoSeq) % 6)) * (40.00 + ((ProdutoSeq * 5) % 40)) AS DECIMAL(18,2))
+    FROM #VendasBees;
+
+    DROP TABLE #VendasBees;
+END
 GO
 
 
@@ -750,4 +1145,47 @@ GO
      -> retorna 2 linhas: uma da venda "convencional" (pedido 8001/8002, vendedor
         "Vendedor Teste Convencional") e uma da venda "Bees" (pedido 9001, vendedor
         "Vendedor Teste Bees").
+
+   ---------- Massa adicional (secao 4-B / 4-C) para os relatorios mais novos ----------
+
+   IDs criados a mais: Fabricantes 502-504 | Gerentes 201, 202 e 159452 (excluido) |
+   Clientes 803-815 (15 no total) | Linhas 602-605 | Produtos 703-715 (15 no total) |
+   Supervisores 902, 903 | Operadores 1002-1006 | Campanha 4 (cancelada) e 5 (fechada,
+   ha 2 meses, com ranking completo de 3 supervisores + 6 operadores) | Vendas
+   Televendas 8100+ e Bees 9100+, distribuidas nos ultimos 2-3 meses.
+
+   POST api/sellout-summary
+   POST api/sellout-summary/monthly
+     Corpo de exemplo:
+       {
+         "startDate": "<primeiro dia de 3 meses atras>",
+         "endDate": "<hoje>",
+         "idManufacturer": [501, 502, 503, 504],
+         "productLine": [601, 602, 603, 604, 605],
+         "products": [],
+         "clients": [],
+         "consideraGrandesContas": false
+       }
+     -> soma as vendas Televendas + Bees dos ultimos 3 meses, EXCLUINDO automaticamente
+        os pedidos do gerente 159452 e (quando consideraGrandesContas = false) os pedidos
+        da GUID Bees 'ce782385-...'. Rode duas vezes (true/false) para comparar o efeito
+        do filtro "Grandes Contas".
+
+   POST api/dynamic-report
+     Corpo de exemplo:
+       {
+         "startDate": "<primeiro dia de 3 meses atras>",
+         "endDate": "<hoje>",
+         "groupBy": ["NomeFabricante", "DataCompetencia"],
+         "metrics": ["ValorVendido", "Positivacao"]
+       }
+     -> agrupa as vendas Televendas + Bees por fabricante e mes de competencia; os
+        totais por fabricante devem bater com a soma manual das linhas geradas na
+        secao 4-C acima (pedidos 8100+ e 9100+).
+
+   GET api/campaign-summary?competenceDateFrom=<DataCompetencia da campanha 5>
+     -> a campanha 5 aparece com TotalPot somando as 3 faixas de premiacao cadastradas
+        e PercentageAchieved calculado a partir de ValorApurado / MetaValor.
+   GET api/campaign-summary/details/5
+     -> retorna os 3 supervisores + 6 operadores com Ranking de 1 a 6 (por TipoPessoa).
    ===================================================================== */

@@ -83,6 +83,7 @@ CREATE TABLE dbo.tblCampanhaTelevendas
     Observacao                                      VARCHAR(150) NULL,
     ConsideraExclusivas                             INT NULL,      -- mapeado como bool? -> int? (HasConversion<int?>)
     TipoCampanhaTelevendas                          BIT NULL,
+    Dinamica                                        BIT NULL,      -- Campaign.IsDynamic (faltava nesta PARTE 1; ver CampaignConfig)
     CONSTRAINT FK_tblCampanhaTelevendas_TipoApuracao
         FOREIGN KEY (IDCampanhaTelevendasTipoApuracao) REFERENCES dbo.tblCampanhaTelevendasTipoApuracao (IDCampanhaTelevendasTipoApuracao),
     CONSTRAINT FK_tblCampanhaTelevendas_TipoCalculo
@@ -319,6 +320,7 @@ CREATE TABLE dbo.tblConsolidacaoVendas
     IDPessoaCliente     INT NULL,
     IDPessoaVendedor    INT NULL,
     IDPessoaFabricante  INT NULL,
+    IDPessoaGerente     INT NULL,   -- usado direto em SellOutSummaryRepository (tblConVen.IDPessoaGerente <> 159452); faltava nesta PARTE 2
     IDDigitador         UNIQUEIDENTIFIER NULL,
     IDOrigem            INT NULL,
     DataFaturamento     DATETIME NULL,
